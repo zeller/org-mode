@@ -2085,13 +2085,14 @@ TYPE must be a string, any of:
 	      (not (file-readable-p file)))
 	  (insert (format "CANNOT INCLUDE FILE %s" file))
 	(when markup
-	  (if (equal (downcase markup) "src")
-	      (setq start (format "#+begin_src %s %s\n"
-				  (or lang "fundamental")
-				  (or switches ""))
-		    end "#+end_src")
-	    (setq start (format "#+begin_%s %s\n" markup switches)
-		  end  (format "#+end_%s" markup))))
+          (cond ((equal (downcase markup) "src")
+                 (setq start (format "#+begin_src %s %s\n"
+                                     (or lang "fundamental")
+                                     (or switches ""))
+                       end "#+end_src"))
+                ((equal (downcas emarkup) "org") nil)
+                (t (setq start (format "#+begin_%s %s\n" markup switches)
+                         end  (format "#+end_%s" markup)))))
 	(insert (or start ""))
 	(insert (org-get-file-contents (expand-file-name file) prefix prefix1 markup))
 	(or (bolp) (newline))
