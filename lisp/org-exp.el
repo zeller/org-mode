@@ -2090,7 +2090,7 @@ TYPE must be a string, any of:
                                      (or lang "fundamental")
                                      (or switches ""))
                        end "#+end_src"))
-                ((equal (downcas emarkup) "org") nil)
+                ((equal (downcase markup) "org") nil)
                 (t (setq start (format "#+begin_%s %s\n" markup switches)
                          end  (format "#+end_%s" markup)))))
 	(insert (or start ""))
