@@ -1792,8 +1792,12 @@ When it is nil, all comments will be removed."
     (goto-char (point-min))
     (when re-radio
       (while (re-search-forward re-radio nil t)
-	(org-if-unprotected
-	 (replace-match "\\1[[\\2]]"))))))
+	(unless
+	    (save-match-data
+	      (or (org-in-regexp org-bracket-link-regexp)
+		  (org-in-regexp org-plain-link-re)))
+	  (org-if-unprotected
+	   (replace-match "\\1[[\\2]]")))))))
 
 (defun org-export-remove-special-table-lines ()
   "Remove tables lines that are used for internal purposes."
@@ -2267,10 +2271,12 @@ INDENT was the original indentation of the block."
 						'((?&."&amp;")(?<."&lt;")(?>."&gt;"))))
 				     t t))
 		    (setq rtn (buffer-string)))
-		  (setq rtn (concat "<pre class=\"example\">" rtn "</pre>\n"))))
+		  (setq rtn (concat "<pre class=\"example\">\n" rtn "</pre>\n"))))
 	      (unless textareap
 		(setq rtn (org-export-number-lines rtn 'html 1 1 num
 						   cont rpllbl fmt)))
+	      (if (string-match "\\(\\`<[^>]*>\\)\n" rtn)
+		  (setq rtn (replace-match "\\1" t nil rtn)))
 	      (concat "\n#+BEGIN_HTML\n" (org-add-props rtn '(org-protected t)) "\n#+END_HTML\n\n"))
 	     ((eq backend 'latex)
 	      (setq rtn (org-export-number-lines rtn 'latex 0 0 num cont rpllbl fmt))
@@ -2500,11 +2506,13 @@ directory."
 				(org-export-directory :org opt-plist)))
 			   (file-name-sans-extension
 			    (file-name-nondirectory bfname))
-			     ".org"))
+			   ".org"))
 	 (filename (and filename
 			(if (equal (file-truename filename)
 				   (file-truename bfname))
-			    (concat filename "-source")
+			    (concat (file-name-sans-extension filename)
+				    "-source."
+				    (file-name-extension filename)))))
 			  filename)))
 	 (backup-inhibited t)
 	 (buffer (find-file-noselect filename))
@@ -2772,7 +2780,7 @@ stacked delimiters is N.  Escaping delimiters is not possible."
   "Push buffer content to kill ring.
 The depends on the variable `org-export-copy-to-kill'."
   (when org-export-copy-to-kill-ring
-    (kill-new (buffer-string))
+    (org-kill-new (buffer-string))
     (when (fboundp 'x-set-selection)
       (ignore-errors (x-set-selection 'PRIMARY (buffer-string)))
       (ignore-errors (x-set-selection 'CLIPBOARD (buffer-string))))

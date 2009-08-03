@@ -277,6 +277,18 @@ uninteresting.  Also tables look terrible when wrapped."
   :group 'org-startup
   :type 'boolean)
 
+(defcustom org-startup-indented nil
+  "Non-nil means, turn on `org-indent-mode' on startup.
+This can also be configured on a per-file basis by adding one of
+the following lines anywhere in the buffer:
+
+   #+STARTUP: indent
+   #+STARTUP: noindent"
+  :group 'org-structure
+  :type '(choice
+	  (const :tag "Not" nil)
+	  (const :tag "Globally (slow on startup in large files)" t)))
+
 (defcustom org-startup-align-all-tables nil
   "Non-nil means, align all tables when visiting a file.
 This is useful when the column width in tables is forced with <N> cookies
@@ -684,15 +696,26 @@ lines to the buffer:
   :type 'boolean)
 
 (defcustom org-adapt-indentation t
-  "Non-nil means, adapt indentation when promoting and demoting.
-When this is set and the *entire* text in an entry is indented, the
-indentation is increased by one space in a demotion command, and
-decreased by one in a promotion command.  If any line in the entry
-body starts at column 0, indentation is not changed at all.
+  "Non-nil means, adapt indentation to outline node level.
 
-This variable also influences how property drawers and planning
-information is inserted.  When t, these lines drawers will be inserted
-indented.  When nil, they will not be indented."
+When this variable is set, Org assumes that you write outlines by
+indenting text in each node to align with the headline (after the stars).
+The following issues are influenced by this variable:
+
+- When this is set and the *entire* text in an entry is indented, the
+  indentation is increased by one space in a demotion command, and
+  decreased by one in a promotion command.  If any line in the entry
+  body starts with text at column 0, indentation is not changed at all.
+
+- Property drawers and planning information is inserted indented when
+  this variable s set.  When nil, they will not be indented.
+
+- TAB indents a line relative to context.  The lines below a headline
+  will be indented when this variable is set.
+
+Note that this is all about true indentation, by adding and removing
+space characters.  See also `org-indent.el' which does level-dependent
+indentation in a virtual way, i.e. at display time in Emacs."
   :group 'org-edit-structure
   :type 'boolean)
 
@@ -1705,8 +1728,9 @@ by a letter in parenthesis, like TODO(t)."
 (defcustom org-provide-todo-statistics t
   "Non-nil means, update todo statistics after insert and toggle.
 ALL-HEADLINES means update todo statistics by including headlines
-with no TODO keyword as well.  A list of TODO keywords means the
-same, but skip keywords that are not in this list.
+with no TODO keyword as well, counting them as not done.
+A list of TODO keywords means the same, but skip keywords that are
+not in this list.
 
 When this is set, todo statistics is updated in the parent of the
 current entry each time a todo state is changed."
@@ -2733,7 +2757,7 @@ org-leve-* faces."
 		    "[^" border "]"
 		    "\\)"
 		    "\\3\\)"
-		    "\\([" post "]\\|$\\)?"))
+		    "\\([" post "]\\|$\\)"))
       (setq org-verbatim-re
 	    (concat "\\([" pre "]\\|^\\)"
 		    "\\("
@@ -2745,10 +2769,10 @@ org-leve-* faces."
 		    "[^" border "]"
 		    "\\)"
 		    "\\3\\)"
-		    "\\([" post  "]\\|$\\)?")))))
+		    "\\([" post  "]\\|$\\)")))))
 
 (defcustom org-emphasis-regexp-components
-  '(" \t('\"{" "- \t.,:!?;'\")}" " \t\r\n,\"'" "." 1)
+  '(" \t('\"{" "- \t.,:!?;'\")}\\" " \t\r\n,\"'" "." 1)
   "Components used to build the regular expression for emphasis.
 This is a list with 6 entries.  Terminology:  In an emphasis string
 like \" *strong word* \", we call the initial space PREMATCH, the final
@@ -2869,7 +2893,8 @@ Normal means, no org-mode-specific context."
 (declare-function org-agenda-copy-local-variable "org-agenda" (var))
 (declare-function org-agenda-check-for-timestamp-as-reason-to-ignore-todo-item
 		  "org-agenda" (&optional end))
-
+(declare-function org-inlinetask-remove-END-maybe "org-inlinetask" ())
+(declare-function org-indent-mode "org-indent" (arg))
 (declare-function parse-time-string "parse-time" (string))
 (declare-function remember "remember" (&optional initial))
 (declare-function remember-buffer-desc "remember" ())
@@ -3141,6 +3166,13 @@ If yes, offer to stop it and to save the buffer with the changes."
    "org-feed"
    '(org-feed-update org-feed-update-all org-feed-goto-inbox)))
 
+
+;; Autoload org-indent.el
+
+(eval-and-compile
+  (org-autoload
+   "org-indent"
+   '(org-indent-mode)))
 
 ;; Autoload archiving code
 ;; The stuff that is needed for cycling and tags has to be defined here.
@@ -3423,6 +3455,8 @@ After a match, the following groups carry important information:
     ("nofold" org-startup-folded nil)
     ("showall" org-startup-folded nil)
     ("content" org-startup-folded content)
+    ("indent" org-startup-indented t)
+    ("noindent" org-startup-indented nil)
     ("hidestars" org-hide-leading-stars t)
     ("showstars" org-hide-leading-stars nil)
     ("odd" org-odd-levels-only t)
@@ -3839,7 +3873,7 @@ This variable is set by `org-before-change-function'.
 (defvar org-inhibit-startup nil)        ; Dynamically-scoped param.
 (defvar org-agenda-keep-modes nil)      ; Dynamically-scoped param.
 (defvar org-inhibit-logging nil)        ; Dynamically-scoped param.
-(defvar org-inhibit-blocking nil)        ; Dynamically-scoped param.
+(defvar org-inhibit-blocking nil)       ; Dynamically-scoped param.
 (defvar org-table-buffer-is-an nil)
 (defconst org-outline-regexp "\\*+ ")
 
@@ -3969,6 +4003,9 @@ The following commands are available:
       (let ((bmp (buffer-modified-p)))
 	(org-table-map-tables 'org-table-align)
 	(set-buffer-modified-p bmp)))
+    (when org-startup-indented
+      (require 'org-indent)
+      (org-indent-mode 1))
     (org-set-startup-visibility)))
 
 (put 'org-mode 'flyspell-mode-predicate 'org-mode-flyspell-verify)
@@ -4202,17 +4239,18 @@ will be prompted for."
   "Run through the buffer and add overlays to links."
   (catch 'exit
     (let (f)
-      (while (re-search-forward org-plain-link-re limit t)
-	(org-remove-flyspell-overlays-in (match-beginning 0) (match-end 0))
-	(setq f (get-text-property (match-beginning 0) 'face))
-	(if (or (eq f 'org-tag)
-		(and (listp f) (memq 'org-tag f)))
-	    nil
-	  (add-text-properties (match-beginning 0) (match-end 0)
-			       (list 'mouse-face 'highlight
-				     'keymap org-mouse-map))
-	  (org-rear-nonsticky-at (match-end 0))
-	  (throw 'exit t))))))
+      (if (re-search-forward org-plain-link-re limit t)
+	  (progn
+	    (org-remove-flyspell-overlays-in (match-beginning 0) (match-end 0))
+	    (setq f (get-text-property (match-beginning 0) 'face))
+	    (if (or (eq f 'org-tag)
+		    (and (listp f) (memq 'org-tag f)))
+		nil
+	      (add-text-properties (match-beginning 0) (match-end 0)
+				   (list 'mouse-face 'highlight
+					 'keymap org-mouse-map))
+	      (org-rear-nonsticky-at (match-end 0)))
+	    t)))))
 
 (defun org-activate-code (limit)
   (if (re-search-forward "^[ \t]*\\(: .*\n?\\)" limit t)
@@ -4547,7 +4585,7 @@ between words."
 	   '(org-font-lock-hook)
 	   ;; Headlines
 	   `(,(if org-fontify-whole-heading-line
-		  "^\\(\\**\\)\\(\\* \\)\\(.*\xa\\)"
+		  "^\\(\\**\\)\\(\\* \\)\\(.*\n?\\)"
 		"^\\(\\**\\)\\(\\* \\)\\(.*\\)")
 	     (1 (org-get-level-face 1))
 	     (2 (org-get-level-face 2))
@@ -4611,6 +4649,7 @@ between words."
 	   ;; Description list items
 	   '("^[ \t]*\\([-+*]\\|[0-9]+[.)]\\) +\\(.*? ::\\)"
 	     2 'bold prepend)
+	   ;; ARCHIVEd headings
 	   (list (concat "^\\*+ \\(.*:" org-archive-tag ":.*\\)")
 		 '(1 'org-archived prepend))
 	   ;; Specials
@@ -4698,6 +4737,7 @@ If KWD is a number, get the corresponding match group."
     (remove-text-properties beg end
 			    '(mouse-face t keymap t org-linked-text t
 					 invisible t intangible t
+					 line-prefix t wrap-prefix t
 					 org-no-flyspell t))))
 
 ;;;; Visibility cycling, including org-goto and indirect buffer
@@ -4740,6 +4780,7 @@ in special contexts.
                From this state, you can move to one of the children
                and zoom in further.
   3. SUBTREE:  Show the entire subtree, including body text.
+  If there is no subtree, switch directly from CHILDREN to FOLDED.
 
 - When there is a numeric prefix, go up to a heading with level ARG, do
   a `show-subtree' and return to the previous cursor position.  If ARG
@@ -4900,9 +4941,17 @@ in special contexts.
       (org-back-to-heading)
       (save-excursion
 	(beginning-of-line 2)
-	(while (and (not (eobp)) ;; this is like `next-line'
-		    (get-char-property (1- (point)) 'invisible))
-	  (beginning-of-line 2)) (setq eol (point)))
+	(if (or (featurep 'xemacs) (<= emacs-major-version 21))
+	    ; XEmacs does not have `next-single-char-property-change'
+	    ; I'm not sure about Emacs 21.
+	    (while (and (not (eobp)) ;; this is like `next-line'
+			(get-char-property (1- (point)) 'invisible))
+	      (beginning-of-line 2))
+	  (while (and (not (eobp)) ;; this is like `next-line'
+		      (get-char-property (1- (point)) 'invisible))
+	    (goto-char (next-single-char-property-change (point) 'invisible))
+	    (or (bolp) (beginning-of-line 2))))
+	(setq eol (point)))
       (outline-end-of-heading)   (setq eoh (point))
       (org-end-of-subtree t)
       (unless (eobp)
@@ -4937,11 +4986,20 @@ in special contexts.
      ((and (eq last-command this-command)
 	   (eq org-cycle-subtree-status 'children))
       ;; We just showed the children, now show everything.
-      (run-hook-with-args 'org-pre-cycle-hook 'subtree)
-      (org-show-subtree)
-      (message "SUBTREE")
-      (setq org-cycle-subtree-status 'subtree)
-      (run-hook-with-args 'org-cycle-hook 'subtree))
+      (if (save-excursion
+	    (beginning-of-line 2)
+	    (re-search-forward org-complex-heading-regexp eos t))
+	  (progn
+	    (run-hook-with-args 'org-pre-cycle-hook 'subtree)
+	    (org-show-subtree)
+	    (message "SUBTREE")
+	    (setq org-cycle-subtree-status 'subtree)
+	    (run-hook-with-args 'org-cycle-hook 'subtree))
+	(run-hook-with-args 'org-pre-cycle-hook 'folded)
+	(hide-subtree)
+	(message "FOLDED (NO SUBTREE)")
+	(setq org-cycle-subtree-status 'folded)
+	(run-hook-with-args 'org-cycle-hook 'folded)))
      (t
       ;; Default action: hide the subtree.
       (run-hook-with-args 'org-pre-cycle-hook 'folded)
@@ -5061,6 +5119,7 @@ This function is the default value of the hook `org-cycle-hook'."
      ((eq state 'children) (or (org-subtree-end-visible-p) (recenter 1)))
      ((eq state 'subtree)  (or (org-subtree-end-visible-p) (recenter 1))))))
 
+;; FIXME: no longer in use
 (defun org-compact-display-after-subtree-move ()
   "Show a compacter version of the tree of the entry's parent."
   (save-excursion
@@ -5072,6 +5131,45 @@ This function is the default value of the hook `org-cycle-hook'."
 	  (org-cycle-show-empty-lines 'children)
 	  (org-cycle-hide-drawers 'children))
       (org-overview))))
+
+(defun org-remove-empty-overlays-at (pos)
+  "Remove outline overlays that do not contain non-white stuff."
+  (mapc
+   (lambda (o)
+     (and (eq 'outline (org-overlay-get o 'invisible))
+	  (not (string-match "\\S-" (buffer-substring (org-overlay-start o)
+							(org-overlay-end o))))
+	  (org-delete-overlay o)))
+   (org-overlays-at pos)))
+
+(defun org-clean-visibility-after-subtree-move ()
+  "Fix visibility issues after moving a subtree."
+  ;; First, find a reasonable region to look at:
+  ;; Start two siblings above, end three below
+  (let* ((beg (save-excursion
+		(and (outline-get-last-sibling)
+		     (outline-get-last-sibling))
+		(point)))
+	 (end (save-excursion 
+		(and (outline-get-next-sibling)
+		     (outline-get-next-sibling)
+		     (outline-get-next-sibling))
+		(if (org-at-heading-p)
+		    (point-at-eol)
+		  (point))))
+	 (level (looking-at "\\*+"))
+	 (re (if level (concat "^" (regexp-quote (match-string 0)) " "))))
+    (save-excursion
+      (save-restriction
+	(narrow-to-region beg end)
+	(when re
+	  ;; Properly fold already folded siblings
+	  (goto-char (point-min))
+	  (while (re-search-forward re nil t)
+	    (if (save-excursion (goto-char (point-at-eol)) (org-invisible-p))
+		(hide-entry))))
+	(org-cycle-show-empty-lines 'overview)
+	(org-cycle-hide-drawers 'overview)))))
 
 (defun org-cycle-show-empty-lines (state)
   "Show empty lines above all visible headlines.
@@ -5120,11 +5218,14 @@ are at least `org-cycle-separator-lines' empty lines before the headline."
 (defun org-cycle-hide-drawers (state)
   "Re-hide all drawers after a visibility state change."
   (when (and (org-mode-p)
-	     (not (memq state '(overview folded))))
+	     (not (memq state '(overview folded contents))))
     (save-excursion
       (let* ((globalp (memq state '(contents all)))
              (beg (if globalp (point-min) (point)))
-             (end (if globalp (point-max) (org-end-of-subtree t))))
+             (end (if globalp (point-max)
+		    (if (eq state 'children)
+			(save-excursion (outline-next-heading) (point))
+		      (org-end-of-subtree t)))))
 	(goto-char beg)
 	(while (re-search-forward org-drawer-regexp end t)
 	  (org-flag-drawer t))))))
@@ -5713,6 +5814,16 @@ Works for outline headings and for plain lists alike."
 
 ;;; Promotion and Demotion
 
+(defvar org-after-demote-entry-hook nil
+  "Hook run after an entry has been demoted.
+The cursor will be at the beginning of the entry.
+When a subtree is being demoted, the hook will be called for each node.")
+
+(defvar org-after-promote-entry-hook nil
+  "Hook run after an entry has been promoted.
+The cursor will be at the beginning of the entry.
+When a subtree is being promoted, the hook will be called for each node.")
+
 (defun org-promote-subtree ()
   "Promote the entire subtree.
 See also `org-promote'."
@@ -5798,7 +5909,8 @@ in the region."
     (replace-match up-head nil t)
     ;; Fixup tag positioning
     (and org-auto-align-tags (org-set-tags nil t))
-    (if org-adapt-indentation (org-fixup-indentation (- diff)))))
+    (if org-adapt-indentation (org-fixup-indentation (- diff)))
+    (run-hooks 'org-after-promote-entry-hook)))
 
 (defun org-demote ()
   "Demote the current heading lower down the tree.
@@ -5811,7 +5923,8 @@ in the region."
     (replace-match down-head nil t)
     ;; Fixup tag positioning
     (and org-auto-align-tags (org-set-tags nil t))
-    (if org-adapt-indentation (org-fixup-indentation diff))))
+    (if org-adapt-indentation (org-fixup-indentation diff))
+    (run-hooks 'org-after-demote-entry-hook)))
 
 (defun org-map-tree (fun)
   "Call FUN for every heading underneath the current one."
@@ -5955,6 +6068,7 @@ is signaled in this case."
     (setq txt (buffer-substring beg end))
     (org-save-markers-in-region beg end)
     (delete-region beg end)
+    (org-remove-empty-overlays-at beg)
     (or (= beg (point-min)) (outline-flag-region (1- beg) beg nil))
     (or (bobp) (outline-flag-region (1- (point)) (point) nil))
     (and (not (bolp)) (looking-at "\n") (forward-char 1))
@@ -5976,12 +6090,12 @@ is signaled in this case."
 	  (kill-line (- ne-ins ne-beg)) (point)))
       (insert (make-string (- ne-ins ne-beg) ?\n)))
     (move-marker ins-point nil)
-    (org-compact-display-after-subtree-move)
-    (org-show-empty-lines-in-parent)
-    (unless folded
+    (if folded
+	(hide-entry)
       (org-show-entry)
       (show-children)
-      (org-cycle-hide-drawers 'children))))
+      (org-cycle-hide-drawers 'children))
+    (org-clean-visibility-after-subtree-move)))
 
 (defvar org-subtree-clip ""
   "Clipboard for cut and paste of subtrees.
@@ -6959,7 +7073,8 @@ For file links, arg negates `org-context-in-file-links'."
   (interactive "P")
   (org-load-modules-maybe)
   (setq org-store-link-plist nil)  ; reset
-  (let (link cpltxt desc description search txt custom-id)
+  (let ((outline-regexp (org-get-limited-outline-regexp))
+	link cpltxt desc description search txt custom-id)
     (cond
 
      ((run-hook-with-args-until-success 'org-store-link-functions)
@@ -8491,7 +8606,7 @@ See also `org-refile-use-outline-path' and `org-completion-use-ido'"
 	      (org-show-context 'org-goto))
 	  (if regionp
 	      (progn
-		(kill-new (buffer-substring region-start region-end))
+		(org-kill-new (buffer-substring region-start region-end))
 		(org-save-markers-in-region region-start region-end))
 	    (org-copy-subtree 1 nil t))
 	  (save-excursion
@@ -8525,6 +8640,8 @@ See also `org-refile-use-outline-path' and `org-completion-use-ido'"
 	  (if regionp
 	      (delete-region (point) (+ (point) region-length))
 	    (org-cut-subtree))
+	  (when (featurep 'org-inlinetask)
+	    (org-inlinetask-remove-END-maybe))
 	  (setq org-markers-to-move nil)
 	  (message "Refiled to \"%s\"" (car it))))))
   (org-reveal))
@@ -8567,7 +8684,9 @@ See also `org-refile-use-outline-path' and `org-completion-use-ido'"
 			nil 'org-refile-history))
     (setq pa (or (assoc answ tbl) (assoc (concat answ "/") tbl)))
     (if pa
-	pa
+	(progn
+	  (setcar org-refile-history (car pa))
+	  pa)
       (when (string-match "\\`\\(.*\\)/\\([^/]+\\)\\'" answ)
 	(setq parent (match-string 1 answ)
 	      child (match-string 2 answ))
@@ -10127,6 +10246,8 @@ command.
 If CALLBACK is non-nil, it is a function which is called to confirm
 that the match should indeed be shown."
   (interactive "sRegexp: \nP")
+  (when (equal regexp "")
+    (error "Regexp cannot be empty"))
   (unless keep-previous
     (org-remove-occur-highlights nil nil t))
   (push (cons regexp callback) org-occur-parameters)
@@ -10294,12 +10415,11 @@ ACTION can be `set', `up', `down', or a character."
 		(goto-char (match-end 2))
 		(insert " [#" news "]"))
 	    (goto-char (match-beginning 3))
-	    (insert "[#" news "] ")))))
-    (org-preserve-lc (org-set-tags nil 'align))
+	    (insert "[#" news "] "))))
+      (org-preserve-lc (org-set-tags nil 'align)))
     (if remove
 	(message "Priority removed")
       (message "Priority of current item set to %s" news))))
-
 
 (defun org-get-priority (s)
   "Find priority cookie and return priority."
@@ -12123,6 +12243,7 @@ user."
 		    (setcar (nthcdr 1 defdecode) 59)
 		    (setq def (apply 'encode-time defdecode)
 			  defdecode (decode-time def)))))
+	 (calendar-frame-setup nil)
 	 (calendar-move-hook nil)
 	 (calendar-view-diary-initially-flag nil)
 	 (view-diary-entries-initially nil)
@@ -13924,6 +14045,8 @@ The images can be removed again with \\[org-ctrl-c-ctrl-c]."
 (if (boundp 'narrow-map)
     (org-defkey narrow-map "s" 'org-narrow-to-subtree)
   (org-defkey org-mode-map "\C-xns" 'org-narrow-to-subtree))
+(org-defkey org-mode-map "\C-c\C-f"    'org-forward-same-level)
+(org-defkey org-mode-map "\C-c\C-b"    'org-backward-same-level)
 (org-defkey org-mode-map "\C-c$"    'org-archive-subtree)
 (org-defkey org-mode-map "\C-c\C-x\C-s" 'org-advertized-archive-subtree)
 (org-defkey org-mode-map "\C-c\C-x\C-a" 'org-toggle-archive-tag)
@@ -14981,6 +15104,7 @@ See the individual commands for more information."
     "--"
     ("Hyperlinks"
      ["Store Link (Global)" org-store-link t]
+     ["Find existing link to here" org-occur-link-in-agenda-files t]
      ["Insert Link" org-insert-link t]
      ["Follow Link" org-open-at-point t]
      "--"
@@ -15620,7 +15744,7 @@ for the search purpose."
   (interactive)
   (let ((link (condition-case nil
 		  (org-store-link nil)
-		(error "Unable to create a link from here"))))
+		(error "Unable to create a link to here"))))
     (org-occur-in-agenda-files (regexp-quote link))))
 
 (defun org-uniquify (list)
@@ -16381,23 +16505,6 @@ When ENTRY is non-nil, show the entire entry."
 			   (save-excursion (outline-end-of-heading) (point))
 			   flag))))
 
-(defun org-forward-same-level (arg)
-  "Move forward to the ARG'th subheading at same level as this one.
-Stop at the first and last subheadings of a superior heading.
-This is like outline-forward-same-level, but invisible headings are ok."
-  (interactive "p")
-  (org-back-to-heading t)
-  (while (> arg 0)
-    (let ((point-to-move-to (save-excursion
-			      (org-get-next-sibling))))
-      (if point-to-move-to
-	  (progn
-	    (goto-char point-to-move-to)
-	    (setq arg (1- arg)))
-	(progn
-	  (setq arg 0)
-	  (error "No following same-level heading"))))))
-
 (defun org-get-next-sibling ()
   "Move to next heading of the same level, and return point.
 If there is no such heading, return nil.
@@ -16444,6 +16551,50 @@ This is like outline-next-sibling, but invisible headings are ok."
     		(forward-char -1))))))
   (point))
 
+(defadvice outline-end-of-subtree (around prefer-org-version activate compile)
+  "Use Org version in org-mode, for dramatic speed-up."
+  (if (eq major-mode 'org-mode)
+      (org-end-of-subtree)
+    ad-do-it))
+
+(defun org-forward-same-level (arg &optional invisible-ok)
+  "Move forward to the arg'th subheading at same level as this one.
+Stop at the first and last subheadings of a superior heading."
+  (interactive "p")
+  (org-back-to-heading)
+  (org-on-heading-p)
+  (let* ((level (- (match-end 0) (match-beginning 0) 1))
+	 (re (format "^\\*\\{1,%d\\} " level))
+	 l)
+    (forward-char 1)
+    (while (> arg 0)
+      (while (and (re-search-forward re nil 'move)
+		  (setq l (- (match-end 0) (match-beginning 0) 1))
+		  (= l level)
+		  (not invisible-ok)
+		  (org-invisible-p))
+	(if (< l level) (setq arg 1)))
+      (setq arg (1- arg)))
+    (beginning-of-line 1)))
+
+(defun org-backward-same-level (arg &optional invisible-ok)
+  "Move backward to the arg'th subheading at same level as this one.
+Stop at the first and last subheadings of a superior heading."
+  (interactive "p")
+  (org-back-to-heading)
+  (org-on-heading-p)
+  (let* ((level (- (match-end 0) (match-beginning 0) 1))
+	 (re (format "^\\*\\{1,%d\\} " level))
+	 l)
+    (while (> arg 0)
+      (while (and (re-search-backward re nil 'move)
+		  (setq l (- (match-end 0) (match-beginning 0) 1))
+		  (= l level)
+		  (not invisible-ok)
+		  (org-invisible-p))
+	(if (< l level) (setq arg 1)))
+      (setq arg (1- arg)))))
+
 (defun org-show-subtree ()
   "Show everything after this heading at deeper levels."
   (outline-flag-region
@@ -16479,7 +16630,7 @@ Show the heading too, if it is currently invisible."
    (mapconcat 'regexp-quote kwds "\\|")
    (if extra (concat "\\|" extra))
    "\\):[ \t]*"
-   "\\(.+\\)"))
+   "\\(.*\\)"))
 
 ;; Make isearch reveal the necessary context
 (defun org-isearch-end ()

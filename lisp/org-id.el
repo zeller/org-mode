@@ -202,7 +202,7 @@ With optional argument FORCE, force the creation of a new ID."
   "Copy the ID of the entry at point to the kill ring.
 Create an ID if necessary."
   (interactive)
-  (kill-new (org-id-get nil 'create)))
+  (org-kill-new (org-id-get nil 'create)))
 
 ;;;###autoload
 (defun org-id-get (&optional pom create prefix)
@@ -577,11 +577,22 @@ optional argument MARKERP, return the position as a new marker."
 (defun org-id-open (id)
   "Go to the entry with id ID."
   (org-mark-ring-push)
-  (let ((m (org-id-find id 'marker)))
+  (let ((m (org-id-find id 'marker))
+	cmd)
     (unless m
       (error "Cannot find entry with ID \"%s\"" id))
+    ;; Use a buffer-switching command in analogy to finding files
+    (setq cmd
+	  (or
+	   (cdr
+	    (assq
+	     (cdr (assq 'file org-link-frame-setup))
+	     '((find-file . switch-to-buffer)
+	       (find-file-other-window . switch-to-buffer-other-window)
+	       (find-file-other-frame . switch-to-buffer-other-frame))))
+	   switch-to-buffer-other-window))
     (if (not (equal (current-buffer) (marker-buffer m)))
-	(switch-to-buffer-other-window (marker-buffer m)))
+	(funcall cmd (marker-buffer m)))
     (goto-char m)
     (move-marker m nil)
     (org-show-context)))

@@ -32,6 +32,8 @@
 
 (require 'org)
 
+(declare-function org-inlinetask-remove-END-maybe "org-inlinetask" ())
+
 (defcustom org-archive-sibling-heading "Archive"
   "Name of the local archive sibling that is used to archive entries locally.
 Locally means: in the tree, under a sibling.
@@ -303,6 +305,8 @@ this heading."
       ;; Here we are back in the original buffer.  Everything seems to have
       ;; worked.  So now cut the tree and finish up.
       (let (this-command) (org-cut-subtree))
+      (when (featurep 'org-inlinetask)
+	(org-inlinetask-remove-END-maybe))
       (setq org-markers-to-move nil)
       (message "Subtree archived %s"
 	       (if (eq this-buffer buffer)

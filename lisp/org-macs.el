@@ -46,7 +46,9 @@
 (defmacro org-unmodified (&rest body)
   "Execute body without changing `buffer-modified-p'."
   `(set-buffer-modified-p
-    (prog1 (buffer-modified-p) ,@body)))
+    (prog1 (buffer-modified-p)
+      (let (before-change-functions after-change-functions)
+	,@body))))
 
 (defmacro org-re (s)
   "Replace posix classes in regular expression."
@@ -255,7 +257,23 @@ This is in contrast to merely setting it to 0."
 					(match-beginning 0) string)))
   (replace-match newtext fixedcase literal string))
 
+(defmacro org-with-limited-levels (&rest body)
+  "Execute BODY with limited number of outline levels."
+  `(let* ((outline-regexp (org-get-limited-outline-regexp)))
+     ,@body))
 
+(defvar org-odd-levels-only) ; defined in org.el
+(defvar org-inlinetask-min-level) ; defined in org-inlinetask.el
+(defun org-get-limited-outline-regexp ()
+  "Return outline-regexp with limited number of levels.
+The number of levels is controlled by "
+  (if (or (not (org-mode-p)) (not (featurep 'org-inlinetask)))
+
+      outline-regexp
+    (let* ((limit-level (1- org-inlinetask-min-level))
+	   (nstars (if org-odd-levels-only (1- (* limit-level 2)) limit-level)))
+      (format "\\*\\{1,%d\\} " nstars))))
+		     
 (provide 'org-macs)
 
 ;; arch-tag: 7e6a73ce-aac9-4fc0-9b30-ce6f89dc6668

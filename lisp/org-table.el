@@ -247,12 +247,28 @@ Automatically means, when TAB or RET or C-c C-c are pressed in the line."
   :type 'boolean)
 
 (defcustom org-table-error-on-row-ref-crossing-hline t
-  "Non-nil means, a relative row reference that tries to cross a hline errors.
-When nil, the reference will silently be to the field just next to the hline.
-Coming from below, it will be the field below the hline, coming from
-above, it will be the field above the hline."
+  "OBSOLETE VARIABLE, please see `org-table-relative-ref-may-cross-hline'."
   :group 'org-table
   :type 'boolean)
+
+(defcustom org-table-relative-ref-may-cross-hline t
+  "Non-nil means, reltive formula references may cross hlines.
+Here are the allowed values:
+
+nil    Relative references may not cross hlines.  They will reference the
+       field next to the hline instead.  Coming from below, the reference
+       will be to the field below the hline.  Coming from above, it will be
+       to the field above.
+t      Relative references may cros hlines.
+error  An attempt to cross a hline will throw an error.
+
+It is probably good to never set this variable to nil, for the sake of
+portability of tables."
+  :group 'org-table-calculation
+  :type '(choice
+	  (const :tag "Allow to cross" t)
+	  (const :tag "Stick to hline" nil)
+	  (const :tag "Error on attempt to cross" error)))
 
 (defgroup org-table-import-export nil
   "Options concerning table import and export in Org-mode."
@@ -471,8 +487,9 @@ property, locally or anywhere up in the hierarchy."
 	(error "Abort")))
     (if (file-directory-p file)
 	(error "This is a directory path, not a file"))
-    (if (equal (file-truename file)
-	       (file-truename (buffer-file-name)))
+    (if (and (buffer-file-name)
+	     (equal (file-truename file)
+		    (file-truename (buffer-file-name))))
 	(error "Please specify a file name that is different from current"))
     (unless format
       (setq deffmt-readable org-table-export-default-format)
@@ -705,6 +722,16 @@ When nil, simply write \"#ERROR\" in corrupted fields.")
     ;; Replace the old one
     (delete-region beg end)
     (move-marker end nil)
+    (if (equal (char-before) ?\n)
+	;; This hack is for org-indent, to force redisplay of the
+	;; line prefix of the first line. Apparently the redisplay
+	;; is tied to the newline, which is, I think, a bug.
+	;; To force this redisplay, we remove and re-insert the
+	;; newline, so that the redisplay engine thinks it belongs
+	;; to the changed text.
+	(progn
+	  (backward-delete-char 1)
+	  (insert "\n")))
     (move-marker org-table-aligned-begin-marker (point))
     (insert new)
     (move-marker org-table-aligned-end-marker (point))
@@ -1403,15 +1430,21 @@ should be done in reverse order."
 
 
 (defun org-table-cut-region (beg end)
-  "Copy region in table to the clipboard and blank all relevant fields."
-  (interactive "r")
+  "Copy region in table to the clipboard and blank all relevant fields.
+If there is no active region, use just the field at point."
+  (interactive (list
+		(if (org-region-active-p) (region-beginning) (point))
+		(if (org-region-active-p) (region-end) (point))))
   (org-table-copy-region beg end 'cut))
 
 (defun org-table-copy-region (beg end &optional cut)
   "Copy rectangular region in table to clipboard.
 A special clipboard is used which can only be accessed
 with `org-table-paste-rectangle'."
-  (interactive "rP")
+  (interactive (list
+		(if (org-region-active-p) (region-beginning) (point))
+		(if (org-region-active-p) (region-end) (point))
+		current-prefix-arg))
   (let* (l01 c01 l02 c02 l1 c1 l2 c2 ic1 ic2
 	 region cols
 	 (rpl (if cut "  " nil)))
@@ -2398,9 +2431,13 @@ and TABLE is a vector with line types."
 		  (>= i 0) (< i l)
 		  (not (eq (aref table i) type))
 		  (if (and relative (eq (aref table i) 'hline))
-		      (if org-table-error-on-row-ref-crossing-hline
-			  (error "Row descriptor %s used in line %d crosses hline" desc cline)
-			(progn (setq i (- i (if backwards -1 1)) n 1) nil))
+		      (cond
+		       ((eq org-table-relative-ref-may-cross-hline t) t)
+		       ((eq org-table-relative-ref-may-cross-hline 'error)
+			(error "Row descriptor %s used in line %d crosses hline" desc cline))
+		       (t (setq i (- i (if backwards -1 1))
+				n 1)
+			  nil))
 		    t)))
       (setq n (1- n)))
     (if (or (< i 0) (>= i l))
