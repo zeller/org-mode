@@ -151,6 +151,15 @@ be exported."
 
 (defvar org-export-blocks-postblock-hooks nil "")
 
+(defun org-export-blocks-src-quote (body &optional language open close)
+  "Insert a segment of formatted source code after processing"
+  (concat
+   "\n#+BEGIN_SRC " (or language "") "\n"
+   (or open "")
+   body (if (string-match "\n$" body) "" "\n")
+   (or close "")
+   "#+END_SRC\n"))
+
 (defun org-export-blocks-html-quote (body &optional open close)
   "Protext BODY from org html export.  The optional OPEN and
 CLOSE tags will be inserted around BODY."
@@ -190,7 +199,7 @@ specified in BLOCKS which default to the value of
 	(goto-char (point-min))
 	(setf start (point))
 	(while (re-search-forward
-		"^\\([ \t]*\\)#\\+begin_\\(\\S-+\\)[ \t]*\\(.*\\)?[\r\n]\\([^\000]*?\\)[\r\n][ \t]*#\\+end_\\S-+.*" nil t)
+		"^\\([ \t]*\\)#\\+begin_\\(\\S-+\\)[ \t]*\\(.*\\)?[\r\n]\\([^\000]*?\\)[\r\n]?[ \t]*#\\+end_\\S-+.*" nil t)
           (save-match-data (setq indentation (length (match-string 1))))
 	  (save-match-data (setf type (intern (match-string 2))))
 	  (unless (memq type types) (setf types (cons type types)))
@@ -211,7 +220,7 @@ specified in BLOCKS which default to the value of
 		  (interblock start (point-max) type))
 		types)))))
 
-(add-hook 'org-export-preprocess-hook 'org-export-blocks-preprocess)
+(add-hook 'org-export-preprocess-after-include-files-hook 'org-export-blocks-preprocess)
 
 ;;================================================================================
 ;; type specific functions
@@ -333,40 +342,70 @@ other backends, it converts the comment into an EXAMPLE segment."
 with their values as determined by R."
   (interactive)
   (message "R processing...")
-  (let ((image-path (or (and (car headers)
-			     (string-match "\\(.?\\)\.\\(EPS\\|eps\\)" (car headers))
+  (let ((echo (let ((foundp (find "-e" headers :test #'string-equal)))
+                (when foundp (setf headers (remove foundp headers)))
+                foundp))
+        (raw (let ((foundp (find "-r" headers :test #'string-equal)))
+                (when foundp (setf headers (remove foundp headers)))
+                foundp))
+        (html (let ((foundp (find "-h" headers :test #'string-equal)))
+                (when foundp (setf headers (remove foundp headers)))
+                foundp))
+        (print (let ((foundp (find "-p" headers :test #'string-equal)))
+                 (when foundp (setf headers (remove foundp headers)))
+                 foundp))
+        (figure (let ((foundp (find "-f" headers :test #'string-equal)))
+                  (when foundp (setf headers (remove foundp headers)))
+                  foundp))
+        (image-path (or (and (car headers)
+			     (string-match "\\(.?\\)\.\\(PNG\\|png\\)" (car headers))
 			     (match-string 1 (car headers)))
 			(and (> (length (car headers)) 0)
 			     (car headers))
 			;; create the default filename
 			(format "Rplot-%03d" count)))
-	(plot (string-match "plot" body))
 	R-proc)
     (setf count (+ count 1))
     (interblock-initiate-R-buffer)
     (setf R-proc (get-buffer-process interblock-R-buffer))
+
+    (when figure
+      (cond 
+        (htmlp (interblock-R-input-command (format "png(file=\"%s.png\", bg=NA);" image-path)))
+        (t (interblock-R-input-command (format "pdf(file=\"%s.pdf\");" image-path)))))
+
     ;; send strings to the ESS process using `comint-send-string'
     (setf body (mapconcat (lambda (line)
-			    (interblock-R-input-command line) (concat "> " line))
-			  (butlast (split-string body "[\r\n]"))
-			  "\n"))
+                            (let ((command-output (interblock-R-command-to-string line nil)))
+                              (concat (if echo (concat "> " line "\n"))
+                                      (if (or print raw) command-output))))
+    			  (split-string body "[\r\n]")
+                          ""))
+
     ;; if there is a plot command, then create the images
-    (when plot
-      (interblock-R-input-command (format "dev.copy2eps(file=\"%s.eps\")" image-path)))
-    (concat (cond
-	     (htmlp (org-export-blocks-html-quote body
-						  (format "<div id=\"R-%d\">\n<pre>\n" count)
-						  "</pre>\n</div>\n"))
-	     (latexp (org-export-blocks-latex-quote body
-						    "\\begin{Schunk}\n\\begin{Sinput}\n"
-						    "\\end{Sinput}\n\\end{Schunk}\n"))
-	     (t (insert ;; default export
-		 "#+begin_R " (mapconcat 'identity headers " ") "\n"
-		 body (if (string-match "\n$" body) "" "\n")
-		 "#+end_R\n")))
-	    (if plot
-		(format "[[file:%s.eps]]\n" image-path)
-	      ""))))
+    (when figure
+      (interblock-R-input-command "dev.off();"))
+    (concat (if (or echo print raw)
+                (cond
+                  (htmlp ;; this could probably be used as the latex export as well
+                   (if (or echo print)
+                       (org-export-blocks-src-quote body "inferior-ess") body))
+                  (latexp
+                   (org-export-blocks-src-quote body
+                                                "inferior-ess"))
+                  ;; (org-export-blocks-latex-quote body
+                  ;;                                "\\begin{Schunk}\n\\begin{Sinput}\n"
+                  ;;                                "\\end{Sinput}\n\\end{Schunk}\n"))
+                  (t (insert ;; default export
+                      "#+BEGIN_R " (mapconcat 'identity headers " ") "\n"
+                      body (if (string-match "\n$" body) "" "\n")
+                      "#+END_R\n"))))
+            (if figure 
+                (cond
+                  (htmlp (format "[[file:out/%s.png]]\n\n" image-path))
+                  (t (format "[[file:%s.pdf]]\n" image-path)) ;; default figure
+                  )
+                ""))))
 
 (defun org-export-interblocks-format-R (start end)
   "This is run over parts of the org-file which are between R
@@ -395,10 +434,10 @@ export."
       (interblock-R-wait-for-output)
       (interblock-R-input-command ""))))
 
-(defun interblock-R-command-to-string (command)
+(defun interblock-R-command-to-string (command &optional all)
   "Send a command to R, and return the results as a string."
   (interblock-R-input-command command)
-  (interblock-R-last-output))
+  (if all (interblock-R-last-output-all) (interblock-R-last-output)))
 
 (defun interblock-R-input-command (command)
   "Pass COMMAND to the R process running in `interblock-R-buffer'."
@@ -428,12 +467,21 @@ export."
       (goto-char (process-mark (get-buffer-process (current-buffer))))
       (forward-line 0)
       (let ((raw (buffer-substring comint-last-input-end (- (point) 1))))
-	(if (string-match "\n" raw)
-	    raw
-	  (and (string-match "\\[[[:digit:]+]\\] *\\(.*\\)$" raw)
-	       (message raw)
-	       (message (match-string 1 raw))
-	       (match-string 1 raw)))))))
+        (if (string-match "\n" raw)
+            (if (string-equal "\n" raw) "" (concat raw "\n"))
+            (concat (and (string-match "\\[[[:digit:]+]\\] *\\(.*\\)$" raw)
+                         (message raw)
+                         (message (match-string 1 raw))
+                         (match-string 1 raw))
+                    "\n"))))))
+
+(defun interblock-R-last-output-all ()
+  "Return the last R output as a string"
+  (save-excursion
+    (save-match-data
+      (set-buffer interblock-R-buffer)
+      (goto-char (process-mark (get-buffer-process (current-buffer))))
+      (buffer-substring comint-last-input-end (- (point) 1)))))
 
 (provide 'org-exp-blocks)
 
