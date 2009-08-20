@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -44,10 +44,12 @@
   `(and (boundp (quote ,var)) ,var))
 
 (defmacro org-unmodified (&rest body)
-  "Execute body without changing `buffer-modified-p'."
+  "Execute body without changing `buffer-modified-p'.
+Also, do not record undo information."
   `(set-buffer-modified-p
     (prog1 (buffer-modified-p)
-      (let (before-change-functions after-change-functions)
+      (let ((buffer-undo-list t)
+	    before-change-functions after-change-functions)
 	,@body))))
 
 (defmacro org-re (s)
@@ -171,7 +173,7 @@ We use a macro so that the test can happen at compilation time."
 
 (defsubst org-check-external-command (cmd &optional use no-error)
   "Check if external progam CMD for USE exists, error if not.
-When the program does exist, return it's path.
+When the program does exist, return its path.
 When it does not exist and NO-ERROR is set, return nil.
 Otherwise, throw an error.  The optional argument USE can describe what this
 program is needed for, so that the error message can be more informative."
@@ -273,7 +275,7 @@ The number of levels is controlled by "
     (let* ((limit-level (1- org-inlinetask-min-level))
 	   (nstars (if org-odd-levels-only (1- (* limit-level 2)) limit-level)))
       (format "\\*\\{1,%d\\} " nstars))))
-		     
+
 (provide 'org-macs)
 
 ;; arch-tag: 7e6a73ce-aac9-4fc0-9b30-ce6f89dc6668

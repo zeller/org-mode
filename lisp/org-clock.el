@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -277,6 +277,7 @@ of a different task.")
 (defun org-clock-save-markers-for-cut-and-paste (beg end)
   "Save relative positions of markers in region."
   (org-check-and-save-marker org-clock-marker beg end)
+  (org-check-and-save-marker org-clock-hd-marker beg end)
   (org-check-and-save-marker org-clock-default-task beg end)
   (org-check-and-save-marker org-clock-interrupted-task beg end)
   (mapc (lambda (m) (org-check-and-save-marker m beg end))
@@ -445,16 +446,16 @@ Notification is shown only once."
 	(setq org-clock-notification-was-shown nil)))))
 
 (defun org-show-notification (notification)
-  "Show notification.  
+  "Show notification.
 Use `org-show-notification-handler' if defined,
 use libnotify if available, or fall back on a message."
   (cond ((functionp org-show-notification-handler)
 	 (funcall org-show-notification-handler notification))
 	((stringp org-show-notification-handler)
-	 (start-process "emacs-timer-notification" nil 
+	 (start-process "emacs-timer-notification" nil
 			org-show-notification-handler notification))
 	((org-program-exists "notify-send")
-	 (start-process "emacs-timer-notification" nil 
+	 (start-process "emacs-timer-notification" nil
 			"notify-send" notification))
 	;; Maybe the handler will send a message, so only use message as
 	;; a fall back option
@@ -592,6 +593,9 @@ the clocking selection, associated with the letter `d'."
 	      (setq ts (org-insert-time-stamp org-clock-start-time
 					      'with-hm 'inactive))))
 	    (move-marker org-clock-marker (point) (buffer-base-buffer))
+	    (move-marker org-clock-hd-marker
+			 (save-excursion (org-back-to-heading t) (point))
+			 (buffer-base-buffer))
 	    (or global-mode-string (setq global-mode-string '("")))
 	    (or (memq 'org-mode-line-string global-mode-string)
 		(setq global-mode-string
@@ -765,6 +769,7 @@ If there is no running clock, throw an error, unless FAIL-QUIETLY is set."
 	    (and (looking-at "\n") (> (point-max) (1+ (point)))
 		 (delete-char 1)))
 	  (move-marker org-clock-marker nil)
+	  (move-marker org-clock-hd-marker nil)
 	  (when org-log-note-clock-out
 	    (org-add-log-setup 'clock-out nil nil nil nil
 			       (concat "# Task: " (org-get-heading t) "\n\n")))
@@ -802,6 +807,8 @@ If there is no running clock, throw an error, unless FAIL-QUIETLY is set."
     (set-buffer (marker-buffer org-clock-marker))
     (goto-char org-clock-marker)
     (delete-region (1- (point-at-bol)) (point-at-eol)))
+  (move-marker 'org-clock-marker nil)
+  (move-marker 'org-clock-hd-marker nil)
   (setq global-mode-string
 	(delq 'org-mode-line-string global-mode-string))
   (force-mode-line-update)
@@ -1306,8 +1313,8 @@ the currently selected interval size."
 				  (cdr (assoc "TIMESTAMP_IA" props)))))
 		  (if (and (not multifile) (= level 1)) (push "|-" tbl))
 		  (push (concat
-			 "| " (int-to-string level) "|" 
-			 (if timestamp (concat tsp "|") "") 
+			 "| " (int-to-string level) "|"
+			 (if timestamp (concat tsp "|") "")
 			 hlc hdl hlc " |"
 			 (make-string (1- level) ?|)
 			 hlc (org-minutes-to-hh:mm-string time) hlc

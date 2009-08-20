@@ -5,7 +5,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -562,7 +562,7 @@ and all references of a footnote label."
 	(goto-char (point-min))
 	(and (re-search-forward (concat "^\\[" (regexp-quote label) "\\]")
 				nil t)
-	     (progn (insert " ") 
+	     (progn (insert " ")
 		    (just-one-space)))))))
 
 (provide 'org-footnote)

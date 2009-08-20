@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -253,6 +253,18 @@ and show a message about remaining backup files, from previous, unfinished
 remember sessions.
 Backup files will only be made at all, when `org-remember-backup-directory'
 is set."
+  :group 'org-remember
+  :type 'boolean)
+
+(defcustom org-remember-warn-about-backups t
+  "Non-nil means warn about backup files in `org-remember-backup-directory'.
+
+Set this to nil if you find that you don't need the warning.
+
+If you cancel remember calls frequently and know when they
+contain useful information (because you know that you made an
+error or emacs crashed, for example) nil is more useful.  In the
+opposite case, the default, t, is more useful."
   :group 'org-remember
   :type 'boolean)
 
@@ -540,7 +552,7 @@ to be run from that hook to function properly."
 		    (org-global-tags-completion-table
 		     (if (equal char "G") (org-agenda-files) (and file (list file)))))
 		   (org-add-colon-after-tag-completion t)
-		   (ins (org-ido-completing-read
+		   (ins (org-icompleting-read
 			 (if prompt (concat prompt ": ") "Tags: ")
 			 'org-tags-completion-function nil nil nil
 			 'org-tags-history)))
@@ -584,7 +596,7 @@ to be run from that hook to function properly."
 			   propprompt
 			   (mapcar 'list (org-split-string allowed "[ \t]+"))
 			   nil 'req-match)
-			(org-completing-read-no-ido propprompt existing nil nil
+			(org-completing-read-no-i propprompt existing nil nil
 					     "" nil ""))))
 	      (org-set-property prop val)))
 	   (char
@@ -597,7 +609,7 @@ to be run from that hook to function properly."
 				   nil nil (list org-end-time-was-given)))
 	   (t
 	    (let (org-completion-use-ido)
-	      (insert (org-completing-read-no-ido
+	      (insert (org-completing-read-no-i
 		       (concat (if prompt prompt "Enter string")
 			       (if default (concat " [" default "]"))
 			       ": ")
@@ -669,7 +681,7 @@ from that hook."
 			(y-or-n-p "The clock is running in this buffer.  Clock out now? "))))
       (let (org-log-note-clock-out) (org-clock-out))))
   (when buffer-file-name
-    (save-buffer))
+    (do-auto-save))
   (remember-finalize))
 
 (defun org-remember-kill ()
@@ -1050,7 +1062,8 @@ See also the variable `org-reverse-note-order'."
 			  (directory-files
 			   org-remember-backup-directory nil
 			   "^remember-.*[0-9]$"))))
-		  (when (> n 0)
+		  (when (and org-remember-warn-about-backups
+                             (> n 0))
 		    (message
 		     "%d backup files (unfinished remember calls) in %s"
 		     n org-remember-backup-directory))))))))))

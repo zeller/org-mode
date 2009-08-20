@@ -4,7 +4,7 @@
 ;;
 ;; Emacs Lisp Archive Entry
 ;; Filename: org-latex.el
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;; Author: Bastien Guerry <bzg AT altern DOT org>
 ;; Maintainer: Carsten Dominik <carsten.dominik AT gmail DOT com>
 ;; Keywords: org, wp, tex
@@ -93,6 +93,7 @@
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
+\\usepackage{soul}
 \\usepackage{hyperref}"
      ("\\section{%s}" . "\\section*{%s}")
      ("\\subsection{%s}" . "\\subsection*{%s}")
@@ -105,6 +106,7 @@
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
+\\usepackage{soul}
 \\usepackage{hyperref}"
      ("\\part{%s}" . "\\part*{%s}")
      ("\\chapter{%s}" . "\\chapter*{%s}")
@@ -117,6 +119,7 @@
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
+\\usepackage{soul}
 \\usepackage{hyperref}"
      ("\\part{%s}" . "\\part*{%s}")
      ("\\chapter{%s}" . "\\chapter*{%s}")
@@ -166,7 +169,7 @@ to represent the section title."
   '(("*" "\\textbf{%s}" nil)
     ("/" "\\emph{%s}" nil)
     ("_" "\\underline{%s}" nil)
-    ("+" "\\texttt{%s}" nil)
+    ("+" "\\st{%s}" nil)
     ("=" "\\verb" t)
     ("~" "\\verb" t))
   "Alist of LaTeX expressions to convert emphasis fontifiers.
@@ -245,9 +248,12 @@ When nil, grouping causes only separation lines between groups."
 
 (defcustom org-export-latex-packages-alist nil
   "Alist of packages to be inserted in the header.
-Each cell is of the forma \( \"option\" . \"package\" \)."
+Each cell is of the format \( \"option\" . \"package\" \)."
   :group 'org-export-latex
-  :type 'alist)
+  :type '(repeat
+	  (list
+	   (string :tag "option")
+	   (string :tag "package"))))
 
 (defcustom org-export-latex-low-levels 'itemize
   "How to convert sections below the current level of sectioning.
@@ -296,6 +302,37 @@ Defaults to \\begin{verbatim} and \\end{verbatim}."
   :group 'org-export-latex
   :type '(cons (string :tag "Open")
 	       (string :tag "Close")))
+
+(defcustom org-export-latex-listings nil
+  "Non-nil means, export source code using the listings package.
+This package will fontify source code, possibly even with color.
+If you want to use this, you also need to make LaTeX use the
+listings package, and if you want to have color, the color
+package.  Just add these to `org-export-latex-packages-alist',
+for example using customize, or with something like
+
+  (require 'org-latex)
+  (add-to-list 'org-export-latex-packages-alist '(\"\" \"listings\"))
+  (add-to-list 'org-export-latex-packages-alist '(\"\" \"color\"))"
+  :group 'org-export-latex
+  :type 'boolean)
+
+(defcustom org-export-latex-listings-langs
+  '(:emacs-lisp "Lisp" :lisp "Lisp"
+		:c "C" :cc "C++"
+		:fortran "fortran"
+		:perl "Perl" :cperl "Perl" :python "Python" :ruby "Ruby"
+		:html "HTML" :xml "XML"
+		:tex "TeX" :latex "TeX"
+		:shell-script "bash"
+		:gnuplot "Gnuplot"
+		:ocaml "Caml" :caml "Caml"
+		:sql "SQL")
+  "Property list mapping languages to their listing language counterpart.
+The key is the major mode symbol, the value is the string that should be
+inserted as the language parameter for the listings package."
+  :group 'org-export-latex
+  :type 'plist)
 
 (defcustom org-export-latex-remove-from-headlines
   '(:todo nil :priority nil :tags nil)
@@ -657,7 +694,7 @@ when PUB-DIR is set, use this as the publishing directory."
       (while cmds
 	(setq cmd (pop cmds))
 	(while (string-match "%b" cmd)
-	  (setq cmd (replace-match 
+	  (setq cmd (replace-match
 		     (save-match-data
 		       (shell-quote-argument base))
 		     t t cmd)))
@@ -961,10 +998,9 @@ If END is non-nil, it is the end of the region."
   (save-excursion
     (goto-char (or beg (point-min)))
     (let* ((pt (point))
-	   (end (or end
-		    (if (re-search-forward "^\\*+ " end t)
-			(goto-char (match-beginning 0))
-		      (goto-char (point-max))))))
+	   (end (if (re-search-forward "^\\*+ " end t)
+		    (goto-char (match-beginning 0))
+		  (goto-char end))))
       (prog1
 	  (org-export-latex-content
 	   (org-export-preprocess-string
@@ -1282,8 +1318,7 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
   "Convert tables to LaTeX and INSERT it."
   (goto-char (point-min))
   (while (re-search-forward "^\\([ \t]*\\)|" nil t)
-    ;; FIXME really need to save-excursion?
-    (save-excursion (org-table-align))
+    (org-table-align)
     (let* ((beg (org-table-begin))
 	   (end (org-table-end))
 	   (raw-table (buffer-substring beg end))
@@ -1399,7 +1434,7 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
       (unless emph
 	(message "`org-export-latex-emphasis-alist' has no entry for formatting triggered by \"%s\""
 		 (match-string 3)))
-      (unless (or (get-text-property (1- (point)) 'org-protected)
+      (unless (or (get-text-property (- (point) 3) 'org-protected)
 		  (save-excursion
 		    (goto-char (match-beginning 1))
 		    (save-match-data

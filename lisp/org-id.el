@@ -5,7 +5,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -87,7 +87,7 @@
 (defcustom org-id-method
   (condition-case nil
       (if (string-match "\\`[-0-9a-fA-F]\\{36\\}\\'"
-			(org-trim (shell-command-to-string 
+			(org-trim (shell-command-to-string
 				   org-id-uuid-program)))
 	  'uuidgen
 	'org)
@@ -563,7 +563,7 @@ optional argument MARKERP, return the position as a new marker."
 ;; so we do have to add it to `org-store-link-functions'.
 
 (defun org-id-store-link ()
-  "Store a link to the current entry, using it's ID."
+  "Store a link to the current entry, using its ID."
   (interactive)
   (let* ((link (org-make-link "id:" (org-id-get-create)))
 	 (desc (save-excursion
@@ -590,7 +590,7 @@ optional argument MARKERP, return the position as a new marker."
 	     '((find-file . switch-to-buffer)
 	       (find-file-other-window . switch-to-buffer-other-window)
 	       (find-file-other-frame . switch-to-buffer-other-frame))))
-	   switch-to-buffer-other-window))
+	   'switch-to-buffer-other-window))
     (if (not (equal (current-buffer) (marker-buffer m)))
 	(funcall cmd (marker-buffer m)))
     (goto-char m)

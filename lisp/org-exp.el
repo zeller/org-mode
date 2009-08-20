@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -50,6 +50,16 @@
   "General options for exporting Org-mode files."
   :tag "Org Export General"
   :group 'org-export)
+
+(defcustom org-export-allow-BIND 'confirm
+  "Non-nil means, allow #+BIND to define local variable values for export.
+This is a potential security risk, which is why the user must confirm the
+use of these lines."
+  :group 'org-export-general
+  :type '(choice
+	  (const :tag "Never" nil)
+	  (const :tag "Always" t)
+	  (const :tag "Make the user confirm for each file" confirm)))
 
 ;; FIXME
 (defvar org-export-publishing-directory nil)
@@ -564,6 +574,7 @@ much faster."
     (:priority		      "pri"	  org-export-with-priority)
     (:TeX-macros	      "TeX"	  org-export-with-TeX-macros)
     (:LaTeX-fragments	      "LaTeX"	  org-export-with-LaTeX-fragments)
+    (:latex-listings	      nil         org-export-latex-listings)
     (:skip-before-1st-heading "skip"	  org-export-skip-text-before-1st-heading)
     (:fixed-width	      ":"	  org-export-with-fixed-width)
     (:timestamps	      "<"	  org-export-with-timestamps)
@@ -605,10 +616,15 @@ Each element is a list of 3 items:
 
 (defun org-default-export-plist ()
   "Return the property list with default settings for the export variables."
-  (let ((l org-export-plist-vars) rtn e s v)
+  (let* ((infile (org-infile-export-plist))
+	 (letbind (plist-get infile :let-bind))
+	 (l org-export-plist-vars) rtn e s v)
     (while (setq e (pop l))
       (setq s (nth 2 e)
-	    v (if (boundp s) (symbol-value s) nil)
+	    v (cond
+	       ((assq s letbind) (nth 1 (assq s letbind)))
+	       ((boundp s) (symbol-value s))
+	       (t nil))
 	    rtn (cons (car e) (cons v rtn))))
     rtn))
 
@@ -699,7 +715,8 @@ modified) list.")
 			    "\n" setup-contents "\n"
 			    (substring ext-setup-or-nil start)))))))
 	(setq p (plist-put p :text text))
-	(setq p (plist-put p :let-bind letbind))
+	(when (and letbind (org-export-confirm-letbind))
+	  (setq p (plist-put p :let-bind letbind)))
 	(when style (setq p (plist-put p :style-extra style)))
 	(when latex-header
 	  (setq p (plist-put p :latex-header-extra (substring latex-header 1))))
@@ -725,8 +742,26 @@ modified) list.")
 	    (setq p (plist-put
 		     p (intern
 			(concat ":macro-" (downcase (match-string 1 val))))
-		     (match-string 2 val)))))
+		     (org-export-interpolate-newlines (match-string 2 val))))))
 	p))))
+
+(defun org-export-interpolate-newlines (s)
+  (while (string-match "\\\\n" s)
+    (setq s (replace-match "\n" t t s)))
+  s)
+
+(defvar org-export-allow-BIND-local nil)
+(defun org-export-confirm-letbind ()
+  "Can we use #+BIND values during export?
+By default this will ask fro confirmation by the user, to divert possible
+security risks."
+  (cond
+   ((not org-export-allow-BIND) nil)
+   ((eq org-export-allow-BIND t) t)
+   ((local-variable-p 'org-export-allow-BIND-local (current-buffer))
+    org-export-allow-BIND-local)
+   (t (org-set-local 'org-export-allow-BIND-local
+		     (yes-or-no-p "Allow BIND values in this buffer? ")))))
 
 (defun org-install-letbind ()
   "Install the values from #+BIND lines as local variables."
@@ -2027,7 +2062,7 @@ TYPE must be a string, any of:
   (goto-char (point-min))
   (let (sy val key args args2 s n)
     (while (re-search-forward
-	    "{{{\\([a-zA-Z][-a-zA-Z0-9_]*\\)\\((\\(.*?\\))\\)?}}}"
+	    "{{{\\([a-zA-Z][-a-zA-Z0-9_]*\\)\\(([ \t\n]*\\([^\000]*?\\))\\)?}}}"
 	    nil t)
       (setq key (downcase (match-string 1))
 	    args (match-string 3))
@@ -2037,7 +2072,8 @@ TYPE must be a string, any of:
 				     (intern (concat ":" key)))))
 	(save-match-data
 	  (when args
-	    (setq args (org-split-string args ",[ \t]*") args2 nil)
+	    (setq args (org-split-string args ",[ \t\n]*") args2 nil)
+	    (setq args (mapcar 'org-trim args))
 	    (while args
 	      (while (string-match "\\\\\\'" (car args))
 		;; repair bad splits
@@ -2108,6 +2144,7 @@ If PREFIX is a string, prepend it to each line.  If PREFIX1
 is a string, prepend it to the first line instead of PREFIX.
 If MARKUP, don't protect org-like lines, the exporter will
 take care of the block they are in."
+  (if (stringp markup) (setq markup (downcase markup)))
   (with-temp-buffer
     (insert-file-contents file)
     (when (or prefix prefix1)
@@ -2117,7 +2154,7 @@ take care of the block they are in."
 	(setq prefix1 nil)
 	(beginning-of-line 2)))
     (buffer-string)
-    (unless markup
+    (when (member markup '("src" "example"))
       (goto-char (point-min))
       (while (re-search-forward "^\\(\\*\\|[ \t]*#\\)" nil t)
 	(goto-char (match-beginning 0))
@@ -2175,6 +2212,8 @@ in the list) and remove property and value from the list in LISTVAR."
 (defvar htmlp)  ;; dynamically scoped
 (defvar latexp)  ;; dynamically scoped
 (defvar org-export-latex-verbatim-wrap) ;; defined in org-latex.el
+(defvar org-export-latex-listings) ;; defined in org-latex.el
+(defvar org-export-latex-listings-langs) ;; defined in org-latex.el
 
 (defun org-export-format-source-code-or-example
   (backend lang code &optional opts indent)
@@ -2281,8 +2320,20 @@ INDENT was the original indentation of the block."
 	     ((eq backend 'latex)
 	      (setq rtn (org-export-number-lines rtn 'latex 0 0 num cont rpllbl fmt))
 	      (concat "\n#+BEGIN_LaTeX\n"
-		      (org-add-props (concat (car org-export-latex-verbatim-wrap)
-					     rtn (cdr org-export-latex-verbatim-wrap))
+		      (org-add-props
+                          (if org-export-latex-listings
+                              (concat
+                               (if lang
+                                   (let* ((lang-sym (intern (concat ":" lang)))
+                                          (lstlang (or (plist-get org-export-latex-listings-langs
+                                                                  lang-sym)
+                                                       lang)))
+                                     (format "\\lstset{language=%s}\n" lstlang))
+                                 "")
+                               "\\begin{lstlisting}\n"
+                               rtn "\\end{lstlisting}\n")
+                            (concat (car org-export-latex-verbatim-wrap)
+                                    rtn (cdr org-export-latex-verbatim-wrap)))
 			  '(org-protected t))
 		      "#+END_LaTeX\n\n"))
 	     ((eq backend 'ascii)
@@ -2344,7 +2395,7 @@ INDENT was the original indentation of the block."
 	(if number
 	    (insert (format fm (incf n)))
 	  (forward-char 1))
-	(when (looking-at lbl-re) 
+	(when (looking-at lbl-re)
 	  (setq ref (match-string 3))
 	  (cond ((numberp replace-labels)
 		 ;; remove labels; use numbers for references when lines
@@ -2357,9 +2408,9 @@ INDENT was the original indentation of the block."
 		 (goto-char (match-beginning 2))
 		 (delete-region (match-beginning 2) (match-end 2))
 		 (insert "(" ref ")")
-		 (push (cons ref (if (> n 0) n (concat "(" ref ")"))) 
+		 (push (cons ref (if (> n 0) n (concat "(" ref ")")))
 		       org-export-code-refs))
-		(t 
+		(t
 		 ;; don't remove labels and don't use numbers for
 		 ;; references
 		 (goto-char (match-beginning 2))
@@ -2512,8 +2563,8 @@ directory."
 				   (file-truename bfname))
 			    (concat (file-name-sans-extension filename)
 				    "-source."
-				    (file-name-extension filename))))
-			  filename)
+				    (file-name-extension filename))
+			  filename)))
 	 (backup-inhibited t)
 	 (buffer (find-file-noselect filename))
 	 (region (buffer-string)))

@@ -7,7 +7,7 @@
 ;;	   Bastien Guerry <bzg AT altern DOT org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.28trans
+;; Version: 6.29trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -216,7 +216,7 @@ the edited version."
 (defun org-edit-src-find-buffer (beg end)
   "Find a source editing buffer that is already editing the region BEG to END."
   (catch 'exit
-    (mapc 
+    (mapc
      (lambda (b)
        (with-current-buffer b
 	 (if (and (string-match "\\`*Org Edit " (buffer-name))
@@ -467,5 +467,4 @@ the language, a switch telling of the content should be in a single line."
 (provide 'org-src)
 
 ;; arch-tag: 6a1fc84f-dec7-47be-a416-64be56bea5d8
-
 ;;; org-src.el ends here
