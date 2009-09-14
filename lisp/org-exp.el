@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.29trans
+;; Version: 6.30trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -29,7 +29,7 @@
 (require 'org)
 (require 'org-agenda)
 (require 'org-exp-blocks)
-(eval-and-compile
+(eval-when-compile
   (require 'cl))
 
 (declare-function org-export-latex-preprocess "org-latex" (parameters))
@@ -1701,7 +1701,7 @@ from the buffer."
 	   (ascii "ASCII" "BEGIN_ASCII" "END_ASCII")
 	   (latex "LaTeX" "BEGIN_LaTeX" "END_LaTeX")))
 	(case-fold-search t)
-	fmt)
+	fmt beg beg-content end end-content)
 
     (while formatters
       (setq fmt (pop formatters))
@@ -1715,16 +1715,17 @@ from the buffer."
 	   (point-at-bol) (min (1+ (point-at-eol)) (point-max))
 	   '(org-protected t))))
       (goto-char (point-min))
-      (while (re-search-forward
-	      (concat "^[ \t]*#\\+" (caddr fmt)
-		      "\\>.*\\(\\(\n.*\\)*?\n\\)[ \t]*#\\+" (cadddr fmt)
-		      "\\>.*\n?") nil t)
-	(if (eq (car fmt) backend)
-	    ;; yes, keep this
-	    (add-text-properties (match-beginning 1) (1+ (match-end 1))
-				 '(org-protected t))
-	  ;; No, this is for a different backend, kill it
-	  (delete-region (match-beginning 0) (match-end 0)))))))
+      (while (re-search-forward (concat "^[ \t]*#\\+" (caddr fmt) "\\>.*\n?")
+				nil t)
+	(setq beg (match-beginning 0) beg-content (match-end 0))
+	(when (re-search-forward (concat "^[ \t]*#\\+" (cadddr fmt) "\\>.*\n?")
+				 nil t)
+	  (setq end (match-end 0) end-content (match-beginning 0))
+	  (if (eq (car fmt) backend)
+	      ;; yes, keep this
+	      (add-text-properties beg-content end-content '(org-protected t))
+	    ;; No, this is for a different backend, kill it
+	    (delete-region beg end)))))))
 
 (defun org-export-mark-blockquote-verse-center ()
   "Mark block quote and verse environments with special cookies.
@@ -1840,11 +1841,26 @@ When it is nil, all comments will be removed."
   (while (re-search-forward "^[ \t]*|" nil t)
     (beginning-of-line 1)
     (if (or (looking-at "[ \t]*| *[!_^] *|")
-	    (and (looking-at ".*?| *<[0-9]+> *|")
-		 (not (looking-at ".*?| *[^ <|]"))))
+	    (not 
+	     (memq
+	      nil
+	      (mapcar
+	       (lambda (f)
+		 (or (= (length f) 0)
+		     (string-match
+		      "\\`<\\([0-9]\\|[rl]\\|[rl][0-9]+\\)>\\'" f)))
+	       (org-split-string ;; FIXME, can't we do this without splitting???
+		(buffer-substring (point-at-bol) (point-at-eol))
+		"[ \t]*|[ \t]*")))))
 	(delete-region (max (point-min) (1- (point-at-bol)))
 		       (point-at-eol))
       (end-of-line 1))))
+
+(defun org-export-protect-sub-super (s)
+  (save-match-data
+    (while (string-match "\\([^\\\\]\\)\\([_^]\\)" s)
+      (setq s (replace-match "\\1\\\\\\2" nil nil s)))
+    s))
 
 (defun org-export-normalize-links ()
   "Convert all links to bracket links, and expand link abbreviations."
@@ -1855,8 +1871,11 @@ When it is nil, all comments will be removed."
     (while (re-search-forward re-plain-link nil t)
       (goto-char (1- (match-end 0)))
       (org-if-unprotected-at (1+ (match-beginning 0))
-       (let* ((s (concat (match-string 1) "[[" (match-string 2)
-			 ":" (match-string 3) "]]")))
+       (let* ((s (concat (match-string 1)
+			 "[[" (match-string 2) ":" (match-string 3)
+			 "][" (match-string 2) ":" (org-export-protect-sub-super
+						    (match-string 3))
+			 "]]")))
 	 ;; added 'org-link face to links
 	 (put-text-property 0 (length s) 'face 'org-link s)
 	 (replace-match s t t))))
@@ -1864,8 +1883,11 @@ When it is nil, all comments will be removed."
     (while (re-search-forward re-angle-link nil t)
       (goto-char (1- (match-end 0)))
       (org-if-unprotected
-       (let* ((s (concat (match-string 1) "[[" (match-string 2)
-			 ":" (match-string 3) "]]")))
+       (let* ((s (concat (match-string 1)
+			 "[[" (match-string 2) ":" (match-string 3)
+			 "][" (match-string 2) ":" (org-export-protect-sub-super
+						    (match-string 3))
+			 "]]")))
 	 (put-text-property 0 (length s) 'face 'org-link s)
 	 (replace-match s t t))))
     (goto-char (point-min))
@@ -2064,36 +2086,41 @@ TYPE must be a string, any of:
     (while (re-search-forward
 	    "{{{\\([a-zA-Z][-a-zA-Z0-9_]*\\)\\(([ \t\n]*\\([^\000]*?\\))\\)?}}}"
 	    nil t)
-      (setq key (downcase (match-string 1))
-	    args (match-string 3))
-      (when (setq val (or (plist-get org-export-opt-plist
-				     (intern (concat ":macro-" key)))
-			  (plist-get org-export-opt-plist
-				     (intern (concat ":" key)))))
-	(save-match-data
-	  (when args
-	    (setq args (org-split-string args ",[ \t\n]*") args2 nil)
-	    (setq args (mapcar 'org-trim args))
-	    (while args
-	      (while (string-match "\\\\\\'" (car args))
-		;; repair bad splits
-		(setcar (cdr args) (concat (substring (car args) 0 -1)
-					   ";" (nth 1 args)))
-		(pop args))
-	      (push (pop args) args2))
-	    (setq args (nreverse args2))
-	    (setq s 0)
-	    (while (string-match "\\$\\([0-9]+\\)" val s)
-	      (setq s (1+ (match-beginning 0))
-		    n (string-to-number (match-string 1 val)))
-	      (and (>= (length args) n)
-		   (setq val (replace-match (nth (1- n) args) t t val)))))
-	  (when (string-match "\\`(eval\\>" val)
-	    (setq val (eval (read val))))
-	  (if (and val (not (stringp val)))
-	      (setq val (format "%s" val))))
-	(and (stringp val)
-	     (replace-match val t t))))))
+      (unless (save-match-data
+		(save-excursion
+		  (goto-char (point-at-bol))
+		  (looking-at "[ \t]*#\\+macro")))
+	(setq key (downcase (match-string 1))
+	      args (match-string 3))
+	(when (setq val (or (plist-get org-export-opt-plist
+				       (intern (concat ":macro-" key)))
+			    (plist-get org-export-opt-plist
+				       (intern (concat ":" key)))))
+	  (save-match-data
+	    (when args
+	      (setq args (org-split-string args ",[ \t\n]*") args2 nil)
+	      (setq args (mapcar 'org-trim args))
+	      (while args
+		(while (string-match "\\\\\\'" (car args))
+		  ;; repair bad splits
+		  (setcar (cdr args) (concat (substring (car args) 0 -1)
+					     ";" (nth 1 args)))
+		  (pop args))
+		(push (pop args) args2))
+	      (setq args (nreverse args2))
+	      (setq s 0)
+	      (while (string-match "\\$\\([0-9]+\\)" val s)
+		(setq s (1+ (match-beginning 0))
+		      n (string-to-number (match-string 1 val)))
+		(and (>= (length args) n)
+		     (setq val (replace-match (nth (1- n) args) t t val)))))
+	    (when (string-match "\\`(eval\\>" val)
+	      (setq val (eval (read val))))
+	    (if (and val (not (stringp val)))
+		(setq val (format "%s" val))))
+	  (and (stringp val)
+	       (prog1 (replace-match val t t)
+		 (goto-char (match-beginning 0)))))))))
 
 (defun org-export-apply-macros-in-string (s)
   "Apply the macros in string S."
@@ -2118,7 +2145,8 @@ TYPE must be a string, any of:
 	    markup (org-symname-or-string (pop params))
 	    lang (and (member markup '("src" "SRC"))
 		      (org-symname-or-string (pop params)))
-	    switches (mapconcat '(lambda (x) (format "%s" x)) params " "))
+	    switches (mapconcat '(lambda (x) (format "%s" x)) params " ")
+	    start nil end nil)
       (delete-region (match-beginning 0) (match-end 0))
       (if (or (not file)
 	      (not (file-exists-p file))
@@ -2134,7 +2162,8 @@ TYPE must be a string, any of:
                 (t (setq start (format "#+begin_%s %s\n" markup switches)
                          end  (format "#+end_%s" markup)))))
 	(insert (or start ""))
-	(insert (org-get-file-contents (expand-file-name file) prefix prefix1 markup))
+	(insert (org-get-file-contents (expand-file-name file)
+				       prefix prefix1 markup))
 	(or (bolp) (newline))
 	(insert (or end ""))))))
 
@@ -2156,7 +2185,7 @@ take care of the block they are in."
     (buffer-string)
     (when (member markup '("src" "example"))
       (goto-char (point-min))
-      (while (re-search-forward "^\\(\\*\\|[ \t]*#\\)" nil t)
+      (while (re-search-forward "^\\([*#]\\|[ \t]*#\\+\\)" nil t)
 	(goto-char (match-beginning 0))
 	(insert ",")
 	(end-of-line 1)))
@@ -2279,7 +2308,15 @@ INDENT was the original indentation of the block."
 		   "htmlize.el 1.34 or later is needed for source code formatting")))
 
 	      (if lang
-		  (let* ((mode (and lang (intern (concat lang "-mode"))))
+		  (let* ((lang-m (when lang
+                                   (or (cdr (assoc lang org-src-lang-modes))
+                                       lang)))
+                         (mode (and lang-m (intern
+					    (concat
+					     (if (symbolp lang-m)
+						 (symbol-name lang-m)
+					       lang-m)
+					     "-mode"))))
 			 (org-inhibit-startup t)
 			 (org-startup-folded nil))
 		    (setq rtn
@@ -2324,10 +2361,14 @@ INDENT was the original indentation of the block."
                           (if org-export-latex-listings
                               (concat
                                (if lang
-                                   (let* ((lang-sym (intern (concat ":" lang)))
-                                          (lstlang (or (plist-get org-export-latex-listings-langs
-                                                                  lang-sym)
-                                                       lang)))
+                                   (let*
+				       ((lang-sym (intern lang))
+					(lstlang
+					 (or (cadr
+					      (assq
+					       lang-sym
+					       org-export-latex-listings-langs))
+					     lang)))
                                      (format "\\lstset{language=%s}\n" lstlang))
                                  "")
                                "\\begin{lstlisting}\n"
@@ -2390,7 +2431,7 @@ INDENT was the original indentation of the block."
 	     "\\)\\)"))
 	   ref)
 
-      (goto-line (1+ skip1))
+      (org-goto-line (1+ skip1))
       (while (and (re-search-forward "^" nil t) (not (eobp)) (< n nmax))
 	(if number
 	    (insert (format fm (incf n)))
@@ -2776,6 +2817,8 @@ If yes remove the column and the special lines."
   (while (string-match org-bracket-link-regexp s)
     (setq s (replace-match (match-string (if (match-end 3) 3 1) s)
 			   t t s)))
+  (while (string-match "\\[\\([0-9]\\|fn:[^]]*\\)\\]" s)
+    (setq s (replace-match "" t t s)))
   s)
 
 (defun org-create-multibrace-regexp (left right n)

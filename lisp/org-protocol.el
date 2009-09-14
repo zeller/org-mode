@@ -9,7 +9,7 @@
 ;; Author: Ross Patterson <me AT rpatterson DOT net>
 ;; Maintainer: Sebastian Rose <sebastian_rose AT gmx DOT de>
 ;; Keywords: org, emacsclient, wp
-;; Version: 6.29trans
+;; Version: 6.30trans
 
 ;; This file is part of GNU Emacs.
 ;;
@@ -422,7 +422,6 @@ The sub-protocol used to reach this function is set in
              uri))
   nil)
 
-
 (defun org-protocol-remember  (info)
   "Process an org-protocol://remember:// style url.
 
@@ -469,7 +468,6 @@ Now template ?b will be used."
 
     (message "Org-mode not loaded."))
   nil)
-
 
 (defun org-protocol-open-source (fname)
   "Process an org-protocol://open-source:// style url.

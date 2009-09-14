@@ -3,8 +3,8 @@
 @setfilename ../../info/org
 @settitle The Org Manual
 
-@set VERSION 6.29trans
-@set DATE August 2009
+@set VERSION 6.30trans
+@set DATE September 2009
 
 @c Version and Contact Info
 @set MAINTAINERSITE @uref{http://orgmode.org,maintainers webpage}
@@ -415,7 +415,7 @@ Hacking
 
 Tables and lists in arbitrary syntax
 
-* Radio tables::                Sending and receiving
+* Radio tables::                Sending and receiving radio tables
 * A LaTeX example::             Step by step, almost a tutorial
 * Translator functions::        Copy and modify
 * Radio lists::                 Doing the same for lists
@@ -506,9 +506,9 @@ questions (FAQ), links to tutorials, etc@.  This page is located at
 @cindex installation
 @cindex XEmacs
 
-@b{Important:} @i{If Org is part of the Emacs distribution or an
-XEmacs package, please skip this section and go directly to
-@ref{Activation}.}
+@b{Important:} @i{If you are using a version of Org that is part of the Emacs
+distribution or an XEmacs package, please skip this section and go directly
+to @ref{Activation}.}
 
 If you have downloaded Org from the Web, either as a distribution @file{.zip}
 or @file{.tar} file, or as a Git archive, you must take the following steps
@@ -532,13 +532,17 @@ step for this directory:
 (setq load-path (cons "~/path/to/orgdir/contrib/lisp" load-path))
 @end example
 
-@b{XEmacs users now need to install the file @file{noutline.el} from
+@sp 2
+@cartouche
+XEmacs users now need to install the file @file{noutline.el} from
 the @file{xemacs} sub-directory of the Org distribution.  Use the
-command:}
+command:
 
 @example
-@b{make install-noutline}
+     make install-noutline
 @end example
+@end cartouche
+@sp 2
 
 @noindent Now byte-compile the Lisp files with the shell command:
 
@@ -566,14 +570,15 @@ make install-info
 make install-info-debian
 @end example
 
-@noindent Then add to @file{.emacs}:
-
+Then add the following line to @file{.emacs}.  It is needed so that
+Emacs can autoload functions that are located in files not immediately loaded
+when Org-mode starts.
 @lisp
-;; This line only if Org is not part of the X/Emacs distribution.
 (require 'org-install)
 @end lisp
 
 Do not forget to activate Org as described in the following section.
+@page
 
 @node Activation, Feedback, Installation, Introduction
 @section Activation
@@ -2595,7 +2600,7 @@ All lines that should be recalculated should be marked with @samp{#}
 or @samp{*}.
 @item /
 Do not export this line.  Useful for lines that contain the narrowing
-@samp{<N>} markers.
+@samp{<N>} markers or column group markers.
 @end table
 
 Finally, just to whet your appetite for what can be done with the
@@ -2968,6 +2973,11 @@ search string.  If the automatically created link is not working correctly or
 accurately enough, you can write custom functions to select the search string
 and to do the search for particular file types---see @ref{Custom searches}.
 The key binding @kbd{C-c l} is only a suggestion---see @ref{Installation}.
+
+@b{Agenda view}@*
+When the cursor is in an agenda view, the created link points to the
+entry referenced by the current line.
+
 @c
 @kindex C-c C-l
 @cindex link completion
@@ -3036,7 +3046,9 @@ with Emacs and select a suitable application for local non-text files.
 Classification of files is based on file extension only.  See option
 @code{org-file-apps}.  If you want to override the default application and
 visit the file with Emacs, use a @kbd{C-u} prefix.  If you want to avoid
-opening in Emacs, use a @kbd{C-u C-u} prefix.
+opening in Emacs, use a @kbd{C-u C-u} prefix.@*
+If the cursor is on a headline, but not on a link, offer all links in the
+headline and entry text.
 @c
 @kindex mouse-2
 @kindex mouse-1
@@ -3820,7 +3832,8 @@ with detailed subtasks on the tree@footnote{To keep subtasks out of the
 global TODO list, see the @code{org-agenda-todo-list-sublevels}.}.  To keep
 the overview over the fraction of subtasks that are already completed, insert
 either @samp{[/]} or @samp{[%]} anywhere in the headline.  These cookies will
-be updates each time the todo status of a child changes.  For example:
+be updates each time the todo status of a child changes, or when pressing
+@kbd{C-c C-c} on the cookie.  For example:
 
 @example
 * Organize Party [33%]
@@ -3968,12 +3981,13 @@ for better visibility, customize the variable
 @code{org-track-ordered-property-with-tag}.
 @kindex C-c #
 @item C-c #
-Update the checkbox statistics in the current outline entry.  When
-called with a @kbd{C-u} prefix, update the entire file.  Checkbox
-statistic cookies are updated automatically if you toggle checkboxes
-with @kbd{C-c C-c} and make new ones with @kbd{M-S-@key{RET}}.  If you
-delete boxes or add/change them by hand, use this command to get things
-back into sync.  Or simply toggle any checkbox twice with @kbd{C-c C-c}.
+Update the statistics cookie in the current outline entry.  When called with
+a @kbd{C-u} prefix, update the entire file.  Checkbox statistic cookies are
+updated automatically if you toggle checkboxes with @kbd{C-c C-c} and make
+new ones with @kbd{M-S-@key{RET}}.  TODO statistics cookies update when
+changing TODO states.  If you delete boxes/entries or add/change them by
+hand, use this command to get things back into sync.  Or simply toggle any
+entry twice (checkboxes with @kbd{C-c C-c}).
 @end table
 
 @node Tags, Properties and Columns, TODO Items, Top
@@ -4024,7 +4038,9 @@ the final heading will have the tags @samp{:work:}, @samp{:boss:},
 @samp{:notes:}, and @samp{:action:} even though the final heading is not
 explicitly marked with those tags.  You can also set tags that all entries in
 a file should inherit just as if these tags were defined in a hypothetical
-level zero that surrounds the entire file.
+level zero that surrounds the entire file.  Use a line like this@footnote{As
+with all these in-buffer settings, pressing @kbd{C-c C-c} activates any
+changes in the line.}:
 
 @cindex #+FILETAGS
 @example
@@ -4609,7 +4625,7 @@ Here is an example for a complete columns definition, along with allowed
 values.
 
 @example
-:COLUMNS:  %20ITEM %9Approved(Approved?)@{X@} %Owner %11Status \@footnote{Please note that the COLUMNS definition must be on a single line---it is wrapped here only because of formatting constraints.}
+:COLUMNS:  %25ITEM %9Approved(Approved?)@{X@} %Owner %11Status \@footnote{Please note that the COLUMNS definition must be on a single line---it is wrapped here only because of formatting constraints.}
                    %10Time_Estimate@{:@} %CLOCKSUM
 :Owner_ALL:    Tammy Mark Karl Lisa Don
 :Status_ALL:   "In progress" "Not started yet" "Finished" ""
@@ -5526,11 +5542,25 @@ assign effort estimates to entries.  If you are also clocking your work, you
 may later want to compare the planned effort with the actual working time, a
 great way to improve planning estimates.  Effort estimates are stored in a
 special property @samp{Effort}@footnote{You may change the property being
-used with the variable @code{org-effort-property}.}.  Clearly the best way to
-work with effort estimates is through column view (@pxref{Column view}).  You
-should start by setting up discrete values for effort estimates, and a
-@code{COLUMNS} format that displays these values together with clock sums (if
-you want to clock your time).  For a specific buffer you can use
+used with the variable @code{org-effort-property}.}.  You can set the effort
+for an entry with the following commands:
+
+@table @kbd
+@kindex C-c C-x e
+@item C-c C-x e
+Set the effort estimate for the current entry.  With a numeric prefix
+argument, set it to the NTH allowed value (see below).  This command is also
+accessible from the agenda with the @kbd{e} key.
+@kindex C-c C-x C-e
+@item C-c C-x C-e
+Modify the effort estimate of the item currently being clocked.
+@end table
+
+Clearly the best way to work with effort estimates is through column view
+(@pxref{Column view}).  You should start by setting up discrete values for
+effort estimates, and a @code{COLUMNS} format that displays these values
+together with clock sums (if you want to clock your time).  For a specific
+buffer you can use
 
 @example
 #+PROPERTY: Effort_ALL 0 0:10 0:30 1:00 2:00 3:00 4:00 5:00 6:00 7:00 8:00
@@ -5742,8 +5772,9 @@ more than one template) and then prepare the buffer like
 @end example
 
 @noindent
-During expansion of the template, special @kbd{%}-escapes allow dynamic
-insertion of content:
+During expansion of the template, special @kbd{%}-escapes@footnote{If you
+need one of these sequences literally, escape the @kbd{%} with a backslash.}
+allow dynamic insertion of content:
 @example
 %^@{@var{prompt}@}  @r{prompt the user for a string and replace this sequence with it.}
             @r{You may specify a default value and a completion table with}
@@ -6907,8 +6938,8 @@ Go to the original location of the item in another window.  Under Emacs
 @itemx @key{RET}
 Go to the original location of the item and delete other windows.
 @c
-@kindex f
-@item f
+@kindex F
+@item F
 @vindex org-agenda-start-with-follow-mode
 Toggle Follow mode.  In Follow mode, as you move the cursor through
 the agenda buffer, the other window always shows the corresponding
@@ -6916,12 +6947,18 @@ location in the Org file.  The initial setting for this mode in new
 agenda buffers can be set with the variable
 @code{org-agenda-start-with-follow-mode}.
 @c
-@kindex b
-@item b
+@kindex C-c C-x b
+@item C-c C-x b
 Display the entire subtree of the current item in an indirect buffer.  With a
 numeric prefix argument N, go up to level N and then take that tree.  If N is
 negative, go up that many levels.  With a @kbd{C-u} prefix, do not remove the
 previously used indirect buffer.
+
+@kindex C-c C-o
+@item C-c C-o
+Follow a link in the entry.  This will offer a selection of any links in the
+text belonging to the referenced Org node.  If there is only one link, it
+will be followed without a selection prompt.
 
 @tsubheading{Change display}
 @cindex display changing, in agenda
@@ -6949,6 +6986,25 @@ setting day, week, or month view, a year may be encoded in the prefix
 argument as well.  For example, @kbd{200712 w} will jump to week 12 in
 2007.  If such a year specification has only one or two digits, it will
 be mapped to the interval 1938-2037.
+@c
+@kindex f
+@item f
+@vindex org-agenda-ndays
+Go forward in time to display the following @code{org-agenda-ndays} days.
+For example, if the display covers a week, switch to the following week.
+With prefix arg, go forward that many times @code{org-agenda-ndays} days.
+@c
+@kindex b
+@item b
+Go backward in time to display earlier dates.
+@c
+@kindex .
+@item .
+Go to today.
+@c
+@kindex j
+@item j
+Prompt for a date and go there.
 @c
 @kindex D
 @item D
@@ -6992,6 +7048,17 @@ covered by the current agenda view.  The initial setting for this mode in new
 agenda buffers can be set with the variable
 @code{org-agenda-start-with-clockreport-mode}.
 @c
+@kindex v E
+@kindex E
+@item v E @ @r{or short} @ E
+@vindex org-agenda-start-with-entry-text-mode
+@vindex org-agenda-entry-text-maxlines
+Toggle entry text mode.  In entry text mode, a number of lines from the Org
+outline node referenced by an agenda line will be displayed below the line.
+The maximum number of lines is given by the variable
+@code{org-agenda-entry-text-maxlines}.  Calling this command with a numeric
+prefix argument will temporarily modify that number to the prefix value.
+@c
 @kindex G
 @item G
 @vindex org-agenda-use-time-grid
@@ -7016,25 +7083,6 @@ Same as @kbd{r}.
 @itemx C-x C-s
 Save all Org buffers in the current Emacs session, and also the locations of
 IDs.
-@c
-@kindex @key{right}
-@item @key{right}
-@vindex org-agenda-ndays
-Display the following @code{org-agenda-ndays} days.  For example, if
-the display covers a week, switch to the following week.  With prefix
-arg, go forward that many times @code{org-agenda-ndays} days.
-@c
-@kindex @key{left}
-@item @key{left}
-Display the previous dates.
-@c
-@kindex .
-@item .
-Go to today.
-@c
-@kindex j
-@item j
-Prompt for a date and go there.
 @c
 @kindex C-c C-x C-c
 @item C-c C-x C-c
@@ -8071,13 +8119,13 @@ property @code{EXPORT_TITLE}, that will take precedence.
 @subheading Headings and sections
 @cindex headings and sections, markup rules
 
-@vindex org-headline-levels
+@vindex org-export-headline-levels
 The outline structure of the document as described in @ref{Document
 Structure}, forms the basis for defining sections of the exported document.
 However, since the outline structure is also used for (for example) lists of
 tasks, only the first three outline levels will be used as headings.  Deeper
 levels will become itemized lists.  You can change the location of this
-switch globally by setting the variable @code{org-headline-levels}, or on a
+switch globally by setting the variable @code{org-export-headline-levels}, or on a
 per-file basis with a line
 
 @cindex #+OPTIONS
@@ -8991,13 +9039,13 @@ view:    @r{Initial view when website is first shown.  Possible values are:}
          showall   @r{Folding interface, all headlines and text visible.}
 sdepth:  @r{Maximum headline level that will still become an independent}
          @r{section for info and folding modes.  The default is taken from}
-         @r{@code{org-headline-levels} (= the @code{H} switch in @code{#+OPTIONS}).}
-         @r{If this is smaller than in @code{org-headline-levels}, each}
+         @r{@code{org-export-headline-levels} (= the @code{H} switch in @code{#+OPTIONS}).}
+         @r{If this is smaller than in @code{org-export-headline-levels}, each}
          @r{info/folding section can still contain child headlines.}
 toc:     @r{Should the table of content @emph{initially} be visible?}
          @r{Even when @code{nil}, you can always get to the "toc" with @kbd{i}.}
 tdepth:  @r{The depth of the table of contents.  The defaults are taken from}
-         @r{the variables @code{org-headline-levels} and @code{org-export-with-toc}.}
+         @r{the variables @code{org-export-headline-levels} and @code{org-export-with-toc}.}
 ftoc:    @r{Does the css of the page specify a fixed position for the "toc"?}
          @r{If yes, the toc will never be displayed as a section.}
 ltoc:    @r{Should there be short contents (children) in each section?}
@@ -10301,6 +10349,8 @@ drawer, offer property commands.
 If the cursor is at a footnote reference, go to the corresponding
 definition, and vice versa.
 @item
+If the cursor is on a statistics cookie, update it.
+@item
 If the cursor is in a plain list item with a checkbox, toggle the status
 of the checkbox.
 @item
@@ -10850,7 +10900,7 @@ or Texinfo.)
 
 
 @menu
-* Radio tables::                Sending and receiving
+* Radio tables::                Sending and receiving radio tables
 * A LaTeX example::             Step by step, almost a tutorial
 * Translator functions::        Copy and modify
 * Radio lists::                 Doing the same for lists
@@ -11112,12 +11162,10 @@ others can benefit from your work.
 @cindex radio lists
 @cindex org-list-insert-radio-list
 
-Sending and receiving radio lists works exactly the same way than
-sending and receiving radio tables (@pxref{Radio tables}) @footnote{You
-need to load the @code{org-export-latex.el} package to use radio lists
-since the relevant code is there for now.}.  As for radio tables, you
-can insert radio lists templates in HTML, La@TeX{} and Texinfo modes by
-calling @code{org-list-insert-radio-list}.
+Sending and receiving radio lists works exactly the same way than sending and
+receiving radio tables (@pxref{Radio tables}).  As for radio tables, you can
+insert radio lists templates in HTML, La@TeX{} and Texinfo modes by calling
+@code{org-list-insert-radio-list}.
 
 Here are the differences with radio tables:
 

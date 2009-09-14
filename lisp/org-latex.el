@@ -4,7 +4,7 @@
 ;;
 ;; Emacs Lisp Archive Entry
 ;; Filename: org-latex.el
-;; Version: 6.29trans
+;; Version: 6.30trans
 ;; Author: Bastien Guerry <bzg AT altern DOT org>
 ;; Maintainer: Carsten Dominik <carsten.dominik AT gmail DOT com>
 ;; Keywords: org, wp, tex
@@ -318,21 +318,27 @@ for example using customize, or with something like
   :type 'boolean)
 
 (defcustom org-export-latex-listings-langs
-  '(:emacs-lisp "Lisp" :lisp "Lisp"
-		:c "C" :cc "C++"
-		:fortran "fortran"
-		:perl "Perl" :cperl "Perl" :python "Python" :ruby "Ruby"
-		:html "HTML" :xml "XML"
-		:tex "TeX" :latex "TeX"
-		:shell-script "bash"
-		:gnuplot "Gnuplot"
-		:ocaml "Caml" :caml "Caml"
-		:sql "SQL")
-  "Property list mapping languages to their listing language counterpart.
-The key is the major mode symbol, the value is the string that should be
-inserted as the language parameter for the listings package."
+  '((emacs-lisp "Lisp") (lisp "Lisp")
+    (c "C") (cc "C++")
+    (fortran "fortran")
+    (perl "Perl") (cperl "Perl") (python "Python") (ruby "Ruby")
+    (html "HTML") (xml "XML")
+    (tex "TeX") (latex "TeX")
+    (shell-script "bash")
+    (gnuplot "Gnuplot")
+    (ocaml "Caml") (caml "Caml")
+    (sql "SQL"))
+  "Alist mapping languages to their listing language counterpart.
+The key is a symbol, the major mode symbol without the \"-mode\".
+The value is the string that should be inserted as the language parameter
+for the listings package.  If the mode name and the listings name are
+the same, the language does not need an entry in this list - but it does not
+hurt if it is present."
   :group 'org-export-latex
-  :type 'plist)
+  :type '(repeat
+	  (list
+	   (symbol :tag "Major mode       ")
+	   (string :tag "Listings language"))))
 
 (defcustom org-export-latex-remove-from-headlines
   '(:todo nil :priority nil :tags nil)
@@ -1000,7 +1006,7 @@ If END is non-nil, it is the end of the region."
     (let* ((pt (point))
 	   (end (if (re-search-forward "^\\*+ " end t)
 		    (goto-char (match-beginning 0))
-		  (goto-char end))))
+		  (goto-char (or end (point-max))))))
       (prog1
 	  (org-export-latex-content
 	   (org-export-preprocess-string
@@ -1313,6 +1319,7 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 
 
 (defvar org-table-last-alignment) ; defined in org-table.el
+(defvar org-table-last-column-widths) ; defined in org-table.el
 (declare-function orgtbl-to-latex "org-table" (table params) t)
 (defun org-export-latex-tables (insert)
   "Convert tables to LaTeX and INSERT it."
@@ -1322,6 +1329,9 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
     (let* ((beg (org-table-begin))
 	   (end (org-table-end))
 	   (raw-table (buffer-substring beg end))
+	   (org-table-last-alignment (copy-sequence org-table-last-alignment))
+	   (org-table-last-column-widths (copy-sequence
+					  org-table-last-column-widths))
 	   fnum fields line lines olines gr colgropen line-fmt align
 	   caption label attr floatp longtblp)
       (if org-export-latex-tables-verbatim
@@ -1346,6 +1356,9 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 	  (apply 'delete-region (list beg end))
 	  (when org-export-table-remove-special-lines
 	    (setq lines (org-table-clean-before-export lines 'maybe-quoted)))
+	  (when org-table-clean-did-remove-column
+	      (pop org-table-last-alignment)
+	      (pop org-table-last-column-widths))
 	  ;; make a formatting string to reflect aligment
 	  (setq olines lines)
 	  (while (and (not line-fmt) (setq line (pop olines)))
@@ -1434,7 +1447,7 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
       (unless emph
 	(message "`org-export-latex-emphasis-alist' has no entry for formatting triggered by \"%s\""
 		 (match-string 3)))
-      (unless (or (get-text-property (- (point) 3) 'org-protected)
+      (unless (or (get-text-property (1- (point)) 'org-protected)
 		  (save-excursion
 		    (goto-char (match-beginning 1))
 		    (save-match-data
@@ -1557,9 +1570,23 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 	     ((not type)
 	      (insert (format "\\hyperref[%s]{%s}"
 			      (org-remove-initial-hash
-			       (org-solidify-link-text raw-path)) desc)))
-	     (path (insert (format "\\href{%s}{%s}" path desc)))
+			       (org-solidify-link-text raw-path))
+			      desc)))
+	     (path 
+	      (when (org-at-table-p)
+		;; There is a strange problem when we have a link in a table,
+		;; ampersands then cause a problem.  I think this must be
+		;; a LaTeX issue, but we here implement a work-around anyway.
+		(setq path (org-export-latex-protect-amp path)
+		      desc (org-export-latex-protect-amp desc)))
+	      (insert (format "\\href{%s}{%s}" path desc)))
 	     (t (insert "\\texttt{" desc "}")))))))
+
+(defun org-export-latex-protect-amp (s)
+  (while (string-match "\\([^\\\\]\\)\\(&\\)" s)
+    (setq s (replace-match (concat (match-string 1 s) "\\" (match-string 2 s))
+			   t t s)))
+  s)
 
 (defun org-remove-initial-hash (s)
   (if (string-match "\\`#" s)
@@ -1663,8 +1690,10 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 		    "\\)?"
 		    (org-create-multibrace-regexp "{" "}" 3))))
     (while (re-search-forward re nil t)
-      (add-text-properties (match-beginning 0) (match-end 0)
-			   '(org-protected t))))
+      (unless (save-excursion (goto-char (match-beginning 0))
+			      (equal (char-after (point-at-bol)) ?#))
+	(add-text-properties (match-beginning 0) (match-end 0)
+			     '(org-protected t)))))
 
   ;; Protect LaTeX entities
   (goto-char (point-min))

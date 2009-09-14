@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.29trans
+;; Version: 6.30trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -71,7 +71,7 @@ Also, do not record undo information."
 	 (_col (current-column)))
      (unwind-protect
 	 (progn ,@body)
-       (goto-line _line)
+       (org-goto-line _line)
        (org-move-to-column _col))))
 
 (defmacro org-without-partial-completion (&rest body)
@@ -102,6 +102,7 @@ We use a macro so that the test can happen at compilation time."
      (save-excursion
        (goto-char (or ,pom (point)))
        ,@body)))
+(put 'org-with-point-at 'lisp-indent-function 1)
 
 (defmacro org-no-warnings (&rest body)
   (cons (if (fboundp 'with-no-warnings) 'with-no-warnings 'progn) body))
@@ -218,6 +219,12 @@ we turn off invisibility temporarily.  Use this in a `let' form."
     (and pos (goto-char pos))
     ;; works also in narrowed buffer, because we start at 1, not point-min
     (+ (if (bolp) 1 0) (count-lines 1 (point)))))
+
+(defsubst org-goto-line (N)
+  (save-restriction
+    (widen)
+    (goto-char (point-min))
+    (forward-line (1- N))))
 
 (defsubst org-current-line-string (&optional to-here)
   (buffer-substring (point-at-bol) (if to-here (point) (point-at-eol))))
