@@ -104,7 +104,9 @@
     (ditaa org-export-blocks-format-ditaa nil)
     (dot org-export-blocks-format-dot nil)
     (r org-export-blocks-format-R nil)
-    (R org-export-blocks-format-R nil))
+    (R org-export-blocks-format-R nil)
+    (quote org-export-blocks-format-quote nil)
+    (QUOTE org-export-blocks-format-quote nil))
   "Use this a-list to associate block types with block exporting
 functions.  The type of a block is determined by the text
 immediately following the '#+BEGIN_' portion of the block header.
@@ -160,6 +162,21 @@ be exported."
    (or close "")
    "#+END_SRC\n"))
 
+(defun org-export-blocks-quote (body &optional open close)
+  "Insert a segment of formatted org markup after processing"
+  (concat
+   "\n#+BEGIN_HTML" "\n"
+   "<blockquote class='callout'>\n"
+   (or open "")
+   "#+END_HTML\n\n"
+   body (if (string-match "\n$" body) "" "\n")
+   "\n#+BEGIN_HTML\n"
+   (if close (concat "<p class='link'>"
+                     close
+                     "</p>") "")
+   "</blockquote>\n"
+   "#+END_HTML\n"))
+
 (defun org-export-blocks-html-quote (body &optional open close)
   "Protext BODY from org html export.  The optional OPEN and
 CLOSE tags will be inserted around BODY."
@@ -204,7 +221,9 @@ specified in BLOCKS which default to the value of
 	  (save-match-data (setf type (intern (match-string 2))))
 	  (unless (memq type types) (setf types (cons type types)))
 	  (setf end (save-match-data (match-beginning 0)))
-	  (interblock start end type)
+          (mapcar (lambda (type)
+                    (interblock start end type))
+                  types) ;; loop over all interblock types
 	  (if (setf func (cadr (assoc type org-export-blocks)))
 	      (progn
                 (replace-match (save-match-data
@@ -353,6 +372,9 @@ with their values as determined by R."
         (print (let ((foundp (find "-p" headers :test #'string-equal)))
                  (when foundp (setf headers (remove foundp headers)))
                  foundp))
+        (cache (let ((foundp (find "-c" headers :test #'string-equal)))
+                 (when foundp (setf headers (remove foundp headers)))
+                 foundp))
         (figure (let ((foundp (find "-f" headers :test #'string-equal)))
                   (when foundp (setf headers (remove foundp headers)))
                   foundp))
@@ -363,10 +385,16 @@ with their values as determined by R."
 			     (car headers))
 			;; create the default filename
 			(format "Rplot-%03d" count)))
-	R-proc)
+	R-proc digest)
     (setf count (+ count 1))
     (interblock-initiate-R-buffer)
     (setf R-proc (get-buffer-process interblock-R-buffer))
+
+    (setf digest (sha1 body))
+    (when cache 
+      (interblock-R-input-command (format "if (!file.exists('%s.R')) {" digest))
+      (interblock-R-input-command "env <- new.env(parent=globalenv())")
+      (interblock-R-input-command "eval(expression({"))
 
     (when figure
       (cond 
@@ -384,6 +412,12 @@ with their values as determined by R."
     ;; if there is a plot command, then create the images
     (when figure
       (interblock-R-input-command "dev.off();"))
+
+    (when cache
+      (interblock-R-input-command "}), env)")
+      (interblock-R-input-command (format "save(list=ls(env), file='%s.R', envir=env)}" digest))
+      (interblock-R-input-command (format "load('%s.R')" digest)))
+
     (concat (if (or echo print raw)
                 (cond
                   (htmlp ;; this could probably be used as the latex export as well
@@ -402,7 +436,7 @@ with their values as determined by R."
             (if figure 
                 (cond
                   (htmlp (format "[[file:out/%s.png]]\n\n" image-path))
-                  (t (format "[[file:%s.pdf]]\n" image-path)) ;; default figure
+                  (t (format "[[file:out/%s.pdf]]\n" image-path)) ;; default figure
                   )
                 ""))))
 
@@ -417,6 +451,8 @@ export."
       (while (and (< (point) end) (re-search-forward "\\\\R{\\(.*\\)}" end t))
 	(save-match-data (setf code (match-string 1)))
 	(setf replacement (interblock-R-command-to-string code))
+        (if (string= (substring replacement 0 1) "\"")
+            (setf replacement (substring replacement 1 (- (length replacement) 2))))
 	(setf replacement (cond
 			   (htmlp replacement)
 			   (latexp replacement)
@@ -481,6 +517,14 @@ export."
       (set-buffer interblock-R-buffer)
       (goto-char (process-mark (get-buffer-process (current-buffer))))
       (buffer-substring comint-last-input-end (- (point) 1)))))
+
+;;--------------------------------------------------------------------------------
+;; quote: quoted org markup
+
+(defun org-export-blocks-format-quote (body &rest headers)
+  "Process QUOTE blocks."
+  (interactive)
+  (org-export-blocks-quote body nil (mapconcat 'identity headers " ")))
 
 (provide 'org-exp-blocks)
 

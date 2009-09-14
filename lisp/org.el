@@ -13961,8 +13961,8 @@ The images can be removed again with \\[org-ctrl-c-ctrl-c]."
 	    (setq txt (match-string n)
 		  beg (match-beginning n) end (match-end n)
 		  cnt (1+ cnt)
-		  linkfile (format "%s_%04d.png" prefix cnt)
-		  movefile (format "%s_%04d.png" absprefix cnt)
+		  linkfile (format "%s_%s.png" prefix (sha1 txt))
+		  movefile (format "%s_%s.png" absprefix (sha1 txt))
 		  link (concat block "[[file:" linkfile "]]" block))
 	    (if msg (message msg cnt))
 	    (goto-char beg)
@@ -13976,9 +13976,9 @@ The images can be removed again with \\[org-ctrl-c-ctrl-c]."
 	      (org-check-external-command
 	       "dvipng" "needed to convert LaTeX fragments to images")
 	      (setq executables-checked t))
-
-	    (org-create-formula-image
-	     txt movefile opt forbuffer)
+            (if (not (file-exists-p movefile))
+                (org-create-formula-image
+                 txt movefile opt forbuffer))
 	    (if overlays
 		(progn
 		  (mapc (lambda (o)
@@ -14036,7 +14036,6 @@ The images can be removed again with \\[org-ctrl-c-ctrl-c]."
 				     org-export-latex-packages-alist "\n"))
 		"")
 	      "\n\\begin{document}\n" string "\n\\end{document}\n"))
-    (debug)
     (let ((dir default-directory))
       (condition-case nil
 	  (progn
