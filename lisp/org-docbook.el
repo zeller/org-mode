@@ -387,7 +387,7 @@ publishing directory."
 	(org-set-local 'buffer-file-name
 		       (with-current-buffer (buffer-base-buffer)
 			 buffer-file-name))
-      (error "Need a file name to be able to export.")))
+      (error "Need a file name to be able to export")))
 
   (message "Exporting...")
   (setq-default org-todo-line-regexp org-todo-line-regexp)
@@ -1401,4 +1401,5 @@ that need to be preserved in later phase of DocBook exporting."
 
 (provide 'org-docbook)
 
+;; arch-tag: a24a127c-d365-4c2a-9e9b-f7dcb0ebfdc3
 ;;; org-docbook.el ends here

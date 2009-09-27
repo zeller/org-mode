@@ -2996,7 +2996,7 @@ With prefix ARG, apply the new formulas to the table."
       (call-interactively 'lisp-indent-line))
      ((looking-at "[$&@0-9a-zA-Z]+ *= *[^ \t\n']") (goto-char pos))
      ((not (fboundp 'pp-buffer))
-      (error "Cannot pretty-print.  Command `pp-buffer' is not available."))
+      (error "Cannot pretty-print.  Command `pp-buffer' is not available"))
      ((looking-at "[$&@0-9a-zA-Z]+ *= *'(")
       (goto-char (- (match-end 0) 2))
       (setq beg (point))
@@ -3343,7 +3343,8 @@ table editor in arbitrary modes.")
 (defvar org-old-auto-fill-inhibit-regexp nil
   "Local variable used by `orgtbl-mode'")
 
-(defconst orgtbl-line-start-regexp "[ \t]*\\(|\\|#\\+\\(TBLFM\\|ORGTBL\\):\\)"
+(defconst orgtbl-line-start-regexp
+  "[ \t]*\\(|\\|#\\+\\(TBLFM\\|ORGTBL\\|TBLNAME\\):\\)"
   "Matches a line belonging to an orgtbl.")
 
 (defconst orgtbl-extra-font-lock-keywords
@@ -3786,7 +3787,7 @@ this table."
 					       (org-table-end)))
 	  (ntbl 0))
       (unless dests (if maybe (throw 'exit nil)
-		      (error "Don't know how to transform this table.")))
+		      (error "Don't know how to transform this table")))
       (dolist (dest dests)
 	(let* ((name (plist-get dest :name))
 	       (transform (plist-get dest :transform))
@@ -4224,7 +4225,7 @@ list of the fields in the rectangle ."
 	  (save-excursion
 	    (goto-char (point-min))
 	    (if (re-search-forward
-		 (concat "^#[ \t]*\\+TBLNAME:[ \t]*" (regexp-quote name-or-id) "[ \t]*$")
+		 (concat "^[ \t]*#\\+TBLNAME:[ \t]*" (regexp-quote name-or-id) "[ \t]*$")
 		 nil t)
 		(setq buffer (current-buffer) loc (match-beginning 0))
 	      (setq id-loc (org-id-find name-or-id 'marker))

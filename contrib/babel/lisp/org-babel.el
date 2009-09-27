@@ -61,6 +61,15 @@ to `org-open-at-point'."
   (interactive "P")
   (or (call-interactively #'org-babel-open-src-block-result) ad-do-it))
 
+(defun org-babel-load-in-session-maybe ()
+  "Detect if this is context for a org-babel src-block and if so
+then run `org-babel-load-in-session'."
+  (interactive)
+  (let ((info (org-babel-get-src-block-info)))
+    (if info (progn (org-babel-load-in-session current-prefix-arg info) t) nil)))
+
+(add-hook 'org-metaup-hook 'org-babel-load-in-session-maybe)
+
 (defun org-babel-pop-to-session-maybe ()
   "Detect if this is context for a org-babel src-block and if so
 then run `org-babel-pop-to-session'."
@@ -164,10 +173,10 @@ the header arguments specified at the source code block."
          (lang (first info))
          (body (second info))
          (params (org-babel-merge-params
-		  (third info) (org-babel-get-src-block-function-args) params))
-	 (processed-params (org-babel-process-params params))
-	 (result-params (third processed-params))
-	 (result-type (fourth processed-params))
+                  (third info) (org-babel-get-src-block-function-args) params))
+         (processed-params (org-babel-process-params params))
+         (result-params (third processed-params))
+         (result-type (fourth processed-params))
          (cmd (intern (concat "org-babel-execute:" lang)))
          result)
     ;; (message "params=%S" params) ;; debugging statement
@@ -175,11 +184,27 @@ the header arguments specified at the source code block."
       (error "Language is not in `org-babel-interpreters': %s" lang))
     (when arg (setq result-params (cons "silent" result-params)))
     (setq result (multiple-value-bind (session vars result-params result-type) processed-params
-		   (funcall cmd body params)))
+                   (funcall cmd body params)))
     (if (eq result-type 'value)
-	(setq result (org-babel-process-value-result result result-params)))
+        (setq result (org-babel-process-value-result result result-params)))
     (org-babel-insert-result result result-params)
     (case result-type (output nil) (value result))))
+
+(defun org-babel-load-in-session (&optional arg info)
+  "Load the body of the current source-code block.  Evaluate the
+header arguments for the source block before entering the
+session.  After loading the body this pops open the session."
+  (interactive)
+  (let* ((info (or info (org-babel-get-src-block-info)))
+         (lang (first info))
+         (body (second info))
+         (params (third info))
+         (session (cdr (assoc :session params))))
+    (unless (member lang org-babel-interpreters)
+      (error "Language is not in `org-babel-interpreters': %s" lang))
+    ;; if called with a prefix argument, then process header arguments
+    (pop-to-buffer (funcall (intern (concat "org-babel-load-session:" lang)) session body params))
+    (move-end-of-line 1)))
 
 (defun org-babel-pop-to-session (&optional arg info)
   "Pop to the session of the current source-code block.  If
@@ -412,7 +437,8 @@ If the point is not on a source block then return nil."
         (re-search-backward "#\\+begin_src" nil t) (setq top (point))
         (re-search-forward "#\\+end_src" nil t) (setq bottom (point))
         (< top initial) (< initial bottom)
-        (goto-char top) (looking-at org-babel-src-block-regexp)
+        (goto-char top) (move-beginning-of-line 1)
+        (looking-at org-babel-src-block-regexp)
         (point))))))
 
 (defun org-babel-goto-named-source-block (&optional name)
@@ -468,8 +494,8 @@ line.  If no result exists for this block then create a
                           ;; or (with optional insert) we need to back up and make one ourselves
                           (when insert
                             (goto-char end) (open-line 2) (forward-char 1)
-                            (insert (concat "#+resname:" (if name (concat " " name))))
-                            (move-beginning-of-line 1) t)))
+                            (insert (concat "#+resname:" (if name (concat " " name)) "\n"))
+                            (move-beginning-of-line 0) t)))
                (point))))))
 
 (defun org-babel-read-result ()
@@ -575,27 +601,26 @@ relies on `org-babel-insert-result'."
   (interactive)
   (save-excursion
     (goto-char (org-babel-where-is-src-block-result t)) (forward-line 1)
-    (delete-region (save-excursion (move-beginning-of-line 0) (point)) (org-babel-result-end))))
+    (delete-region (point) (org-babel-result-end))))
 
 (defun org-babel-result-end ()
   "Return the point at the end of the current set of results"
   (save-excursion
     (if (org-at-table-p)
-        (progn (goto-char (org-table-end)) (forward-line 1) (point))
+        (progn (goto-char (org-table-end)) (point))
       (let ((case-fold-search t))
         (cond
          ((looking-at "#\\+begin_latex")
           (search-forward "#+end_latex" nil t)
-          (forward-line 2))
+          (forward-line 1))
          ((looking-at "#\\+begin_html")
           (search-forward "#+end_html" nil t)
-          (forward-line 2))
+          (forward-line 1))
          ((looking-at "#\\+begin_example")
           (search-forward "#+end_example" nil t)
-          (forward-line 2))
+          (forward-line 1))
          (t (progn (while (looking-at "\\(: \\|\\[\\[\\)")
-                     (forward-line 1))
-                   (forward-line 1)))))
+                     (forward-line 1))))))
       (point))))
 
 (defun org-babel-result-to-file (result)

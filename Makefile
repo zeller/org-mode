@@ -69,6 +69,7 @@ LISPF      = 	org.el			\
 	     	org-colview.el		\
 	     	org-colview-xemacs.el	\
 	     	org-compat.el		\
+	     	org-crypt.el		\
 		org-exp.el		\
 		org-exp-blocks.el	\
 		org-docbook.el		\
@@ -90,6 +91,7 @@ LISPF      = 	org.el			\
 	     	org-macs.el		\
 		org-mew.el              \
 		org-mhe.el		\
+		org-mobile.el		\
 		org-mouse.el		\
 		org-publish.el		\
 		org-plot.el		\
@@ -339,6 +341,7 @@ lisp/org-clock.elc:	lisp/org.el
 lisp/org-colview.elc:	lisp/org.el
 lisp/org-colview-xemacs.elc:	lisp/org.el
 lisp/org-compat.elc:	lisp/org-macs.el
+lisp/org-crypt.elc:	lisp/org-crypt.el lisp/org.el
 lisp/org-exp.elc:	lisp/org.el lisp/org-agenda.el
 lisp/org-exp-blocks.elc: lisp/org.el
 lisp/org-latex.elc:	lisp/org.el lisp/org-exp.el
@@ -360,6 +363,7 @@ lisp/org-mac-message.elc:	lisp/org.el
 lisp/org-macs.elc:
 lisp/org-mew.elc:	lisp/org.el
 lisp/org-mhe.elc:	lisp/org.el
+lisp/org-mobile.elc:	lisp/org.el
 lisp/org-mouse.elc:	lisp/org.el
 lisp/org-plot.elc:	lisp/org.el lisp/org-exp.el lisp/org-table.el
 lisp/org-publish.elc:
