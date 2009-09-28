@@ -261,6 +261,17 @@ or \"toc:3\"."
 	  (const :tag "Full Table of Contents" t)
 	  (integer :tag "TOC to level")))
 
+(defcustom org-export-R-tangle nil
+  "Non-nil means, tangle the blocks of R code into a single
+  executable file (with .R extension)
+
+This option can also be set with the +OPTIONS line, e.g. \"tangle:nil\"
+or \"tangle:t\"."
+  :group 'org-export-general
+  :type '(choice
+	  (const :tag "No Tangling of R blocks" nil)
+	  (const :tag "Tangling of R blocks" t)))
+
 (defcustom org-export-mark-todo-in-toc nil
   "Non-nil means, mark TOC lines that contain any open TODO items."
   :group 'org-export-general
@@ -605,8 +616,8 @@ much faster."
     (:email		      nil	  user-mail-address)
     (:select-tags	      nil	  org-export-select-tags)
     (:exclude-tags	      nil	  org-export-exclude-tags)
-
-    (:latex-image-options     nil	  org-export-latex-image-default-option))
+    (:latex-image-options     nil         org-export-latex-image-default-option)
+    (:R-tangle                "R"         org-export-R-tangle))
   "List of properties that represent export/publishing variables.
 Each element is a list of 3 items:
 1. The property that is used internally, and also for org-publish-project-alist
@@ -2671,7 +2682,7 @@ Does include HTML export options as well as TODO and CATEGORY stuff."
 #+KEYWORDS: 
 #+LANGUAGE:  %s
 #+OPTIONS:   H:%d num:%s toc:%s \\n:%s @:%s ::%s |:%s ^:%s -:%s f:%s *:%s <:%s
-#+OPTIONS:   TeX:%s LaTeX:%s skip:%s d:%s todo:%s pri:%s tags:%s
+#+OPTIONS:   TeX:%s LaTeX:%s skip:%s d:%s todo:%s pri:%s tags:%s R:%s
 %s
 #+EXPORT_SELECT_TAGS: %s
 #+EXPORT_EXCLUDE_TAGS: %s
@@ -2710,6 +2721,7 @@ Does include HTML export options as well as TODO and CATEGORY stuff."
    org-export-with-todo-keywords
    org-export-with-priority
    org-export-with-tags
+   org-export-R-tangle
    (if (featurep 'org-jsinfo) (org-infojs-options-inbuffer-template) "")
    (mapconcat 'identity org-export-select-tags " ")
    (mapconcat 'identity org-export-exclude-tags " ")

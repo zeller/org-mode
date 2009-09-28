@@ -236,7 +236,11 @@ specified in BLOCKS which default to the value of
 	  (setf start (save-match-data (match-end 0))))
 	(mapcar (lambda (type)
 		  (interblock start (point-max) type))
-		types)))))
+		types)))
+    (if (plist-get opt-plist :R-tangle)
+        (progn
+          (switch-to-buffer R-tangle-buffer)
+          (save-buffer)))))
 
 (add-hook 'org-export-preprocess-after-include-files-hook 'org-export-blocks-preprocess)
 
@@ -354,6 +358,9 @@ other backends, it converts the comment into an EXAMPLE segment."
 (defvar interblock-R-buffer nil
   "Holds the buffer for the current R process")
 
+(defvar R-tangle-buffer nil
+  "Holds the buffer for writing all blocks of R code to")
+
 (defvar count) ; dynamicaly scoped from `org-export-blocks-preprocess'?
 (defun org-export-blocks-format-R (body &rest headers)
   "Process R blocks and replace \R{} forms outside the blocks
@@ -386,8 +393,17 @@ with their values as determined by R."
 			;; create the default filename
 			(format "Rplot-%03d" count)))
 	R-proc digest)
+
     (setf count (+ count 1))
     (interblock-initiate-R-buffer)
+
+    ;; tangle to .R file
+    (if (plist-get opt-plist :R-tangle)
+        (save-excursion
+          (switch-to-buffer R-tangle-buffer)
+          (insert (concat "### R block " (number-to-string count) " ###\n"))
+          (insert (concat body "\n\n"))))
+
     (setf R-proc (get-buffer-process interblock-R-buffer))
 
     (setf digest (sha1 body))
@@ -464,6 +480,12 @@ export."
   "If there is not a current R process then create one."
   (unless (and (buffer-live-p interblock-R-buffer) (get-buffer interblock-R-buffer))
     (save-excursion
+      (when (plist-get opt-plist :R-tangle)
+        (let ((tangle-file (concat (file-name-sans-extension filename) ".R")))
+          (when (file-exists-p tangle-file)
+            (delete-file tangle-file))
+          (find-file tangle-file)
+          (setf R-tangle-buffer (current-buffer))))
       (R)
       (setf interblock-R-buffer (current-buffer))
       (interblock-R-wait-for-output)
