@@ -437,10 +437,10 @@ in this way, it will be wrapped."
 (defvar org-export-generic-section-suffix "")
 
 ;;;###autoload
-(defun org-set-generic-type (type definition)
+(defun org-set-generic-type (definition)
   "Adds a TYPE and DEFINITION to the existing list of defined generic
 export definitions."
-  (set-alist 'org-generic-alist type definition))
+  (add-to-list 'org-generic-alist definition))
 
 (defun org-export-generic-remember-section (type suffix &optional prefix)
   (setq org-export-generic-section-type type)
