@@ -243,6 +243,10 @@ specified in BLOCKS which default to the value of
 
 (add-hook 'org-export-preprocess-after-include-files-hook 'org-export-blocks-preprocess)
 
+;; for setting up R
+;; TODO generalize to a list of org-export-blocks-initialize functions
+(add-hook 'org-export-preprocess-hook 'org-export-blocks-initialize-R)
+
 ;;================================================================================
 ;; type specific functions
 
@@ -361,6 +365,14 @@ other backends, it converts the comment into an EXAMPLE segment."
   "Holds the buffer for writing all blocks of R code to")
 
 (defvar count) ; dynamicaly scoped from `org-export-blocks-preprocess'?
+
+(defun org-export-blocks-initialize-R ()
+  "Set the working directory and start the R process"
+  (interblock-initiate-R-buffer)
+  (let ((out-directory (format "%sout" (file-name-directory filename))))
+    (if (not (file-exists-p out-directory)) (mkdir out-directory))
+    (interblock-R-input-command (format "setwd('%s')" out-directory))))
+
 (defun org-export-blocks-format-R (body &rest headers)
   "Process R blocks and replace \R{} forms outside the blocks
 with their values as determined by R."
@@ -406,13 +418,13 @@ with their values as determined by R."
     (setf R-proc (get-buffer-process interblock-R-buffer))
 
     (setf digest (sha1 body))
-    (when cache 
+    (when cache
       (interblock-R-input-command (format "if (!file.exists('%s.R')) {" digest))
       (interblock-R-input-command "env <- new.env(parent=globalenv())")
       (interblock-R-input-command "eval(expression({"))
 
     (when figure
-      (cond 
+      (cond
         (htmlp (interblock-R-input-command (format "png(file=\"%s.png\", bg=NA);" image-path)))
         (t (interblock-R-input-command (format "pdf(file=\"%s.pdf\");" image-path)))))
 
@@ -445,10 +457,10 @@ with their values as determined by R."
                   ;;                                "\\begin{Schunk}\n\\begin{Sinput}\n"
                   ;;                                "\\end{Sinput}\n\\end{Schunk}\n"))
                   (t (insert ;; default export
-                      "#+BEGIN_R " (mapconcat 'identity headers " ") "\n"
-                      body (if (string-match "\n$" body) "" "\n")
-                      "#+END_R\n"))))
-            (if figure 
+                      ;; "#+BEGIN_R " (mapconcat 'identity headers " ") "\n"
+                      body (if (string-match "\n$" body) "" "\n")))))
+                      ;; "#+END_R\n"))))
+            (if figure
                 (cond
                   (htmlp (format "[[file:out/%s.png]]\n\n" image-path))
                   (t (format "[[file:out/%s.pdf]]\n" image-path)) ;; default figure
