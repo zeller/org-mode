@@ -371,7 +371,7 @@ other backends, it converts the comment into an EXAMPLE segment."
   (interblock-initiate-R-buffer)
   (let ((out-directory (format "%sout" (file-name-directory filename))))
     (if (not (file-exists-p out-directory)) (mkdir out-directory))
-    (interblock-R-input-command (format "setwd('%s')" out-directory))))
+    (interblock-R-input-command (format "setwd('%S')" out-directory))))
 
 (defun org-export-blocks-format-R (body &rest headers)
   "Process R blocks and replace \R{} forms outside the blocks
