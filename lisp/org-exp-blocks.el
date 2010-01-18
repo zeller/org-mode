@@ -547,7 +547,7 @@ export."
                          (message raw)
                          (message (match-string 1 raw))
                          (match-string 1 raw))
-                    "\n"))))))
+                    ""))))))
 
 (defun interblock-R-last-output-all ()
   "Return the last R output as a string"

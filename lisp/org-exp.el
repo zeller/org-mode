@@ -2153,6 +2153,7 @@ TYPE must be a string, any of:
       (setq params (read (concat "(" (match-string 1) ")"))
 	    prefix (org-get-and-remove-property 'params :prefix)
 	    prefix1 (org-get-and-remove-property 'params :prefix1)
+            args (org-get-and-remove-property 'params :args t)
 	    file (org-symname-or-string (pop params))
 	    markup (org-symname-or-string (pop params))
 	    lang (and (member markup '("src" "SRC"))
@@ -2164,6 +2165,8 @@ TYPE must be a string, any of:
 	      (not (file-exists-p file))
 	      (not (file-readable-p file)))
 	  (insert (format "CANNOT INCLUDE FILE %s" file))
+        (when args
+          (insert (concat "#+BEGIN_R\nargs <- c" (prin1-to-string args t)) "\n#+END_R\n"))
 	(when markup
           (cond ((equal (downcase markup) "src")
                  (setq start (format "#+begin_src %s %s\n"
@@ -2201,19 +2204,20 @@ take care of the block they are in."
 	(goto-char (match-beginning 0))
 	(insert ",")
 	(end-of-line 1)))
+    (org-export-handle-include-files)
     (buffer-string)))
 
-(defun org-get-and-remove-property (listvar prop)
+(defun org-get-and-remove-property (listvar prop &optional right-trim)
   "Check if the value of LISTVAR contains PROP as a property.
 If yes, return the value of that property (i.e. the element following
 in the list) and remove property and value from the list in LISTVAR."
   (let ((list (symbol-value listvar)) m v)
     (when (setq m (member prop list))
-      (setq v (nth 1 m))
+      (setq v (if right-trim (cdr m) (nth 1 m)))
       (if (equal (car list) prop)
-	  (set listvar (cddr list))
+	  (set listvar (if right-trim nil (cddr list)))
 	(setcdr (nthcdr (- (length list) (length m) 1) list)
-		(cddr m))
+		(if right-trim nil (cddr m)))
 	(set listvar list)))
     v))
 
