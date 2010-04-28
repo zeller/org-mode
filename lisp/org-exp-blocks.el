@@ -451,8 +451,10 @@ with their values as determined by R."
                    (if (or echo print)
                        (org-export-blocks-src-quote body "inferior-ess") body))
                   (latexp
-                   (org-export-blocks-src-quote body
-                                                "inferior-ess"))
+                   (if raw
+                       (org-export-blocks-latex-quote body)
+                       (org-export-blocks-src-quote body
+                                                    "inferior-ess")))
                   ;; (org-export-blocks-latex-quote body
                   ;;                                "\\begin{Schunk}\n\\begin{Sinput}\n"
                   ;;                                "\\end{Sinput}\n\\end{Schunk}\n"))
